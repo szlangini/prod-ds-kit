@@ -1,0 +1,37 @@
+# Python
+*.egg-info/
+build/
+dist/
+*.pyc
+__pycache__/
+.venv/
+venv/
+
+# TPC-DS toolkit (cloned at install)
+tpcds-kit/
+
+# C++ stringify binary
+workload/dsdgen/stringify_cpp
+
+# Data folders (generated)
+data/
+data_utf8/
+
+# Generated queries
+queries/
+
+# Experiment runs
+experiments/plan_runs/
+
+# DuckDB artifacts
+*.duckdb
+
+# OS junk
+.DS_Store
+
+# Local tooling
+.claude/
+tools/.stringify_rules.yml
+
+# Join generator temp
+.join_tmp/

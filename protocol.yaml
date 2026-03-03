@@ -1,0 +1,699 @@
+# Paths in this document use environment variables. See install.sh for setup.
+
+protocol:
+  id: prodds_frozen_2026_02_11
+  protocol_version: 1.2
+  status: frozen_draft
+  updated_at_utc: "2026-02-28T23:30:00Z"
+  changelog:
+    - "2026-02-11: Added mandatory cross-engine ANALYZE phase."
+    - "2026-02-12: Added interim E1 (3-engine) subset freeze and seed audit records."
+    - "2026-02-12: Threading baseline changed to physical cores (56), optional full-core 112."
+    - "2026-02-12: E2 fast-track metric scope frozen (3 engines, fast subset rule, DuckDB deep-dive target)."
+    - "2026-02-12: E3 join-scaling micro-suite completed (3 engines, PostgreSQL excluded, planning-ratio recorded)."
+    - "2026-02-12: E5 DuckDB stringification sweep spec frozen (SF10, STR1..STR10, preflight + 3-query timing)."
+    - "2026-02-12: E6 DuckDB post-E5 result verification added (deterministic wrapper + SHA256 fingerprinting)."
+    - "2026-02-12: E5 pure-data mode enforced (query text invariant; query-layer extensions disabled)."
+    - "2026-02-15: E5 switched to strict STR1..STR10 data roots (no str10 fallback) and runtime query-hash provenance."
+    - "2026-02-16: Added optional E5_new extended STR sweep (DuckDB, STR1..STR_MAX, default 15)."
+    - "2026-02-27: Added SF100 paper-refresh campaign plan, bootstrap copy locations, and disk-aware execution order."
+    - "2026-02-28: SF100 frozen standard set recorded (base no-error incl timeout + J/U microsuites) and timing policy updated to 1 warmup / 10 reps (Postgres 3)."
+  sources_of_truth:
+    - results/20260211T123144Z_experiment0_patch_monetdb/protocol_manifest.json
+    - results/20260211T123144Z_experiment0_patch_monetdb/engines_versions.json
+    - results/20260211T123144Z_experiment0_patch_monetdb/threads.json
+    - results/20260211T123144Z_experiment0_patch_monetdb/engines_control.md
+    - results/20260211T123144Z_experiment0_patch_monetdb/queries_inventory.md
+    - results/20260211T123144Z_experiment0_patch_monetdb/jan_TODO.md
+    - results/20260211T125633Z_preflight_guard_patch/guard_integration_notes.md
+    - results/20260211T125633Z_preflight_guard_patch/repo_data_cleanup.md
+  supersedes_legacy_policy:
+    fixed_32_threads: true
+    fixed_512_gib_memory_cap: true
+    fixed_30_min_timeout: true
+    clickhouse_benchmark_scope: true
+
+environment:
+  os:
+    pretty_name: "Ubuntu 24.04.4 LTS"
+    patch_level_accepted: true
+  kernel: "6.14.0-37-generic"
+  cpu:
+    model: "AMD EPYC 7453 28-Core Processor"
+    sockets: 2
+    cores_per_socket: 28
+    physical_cores: 56
+    threads_per_core: 2
+    logical_cpus: 112
+  memory:
+    summary: "Mem: 1.0Ti"
+
+engines:
+  scope:
+    - duckdb
+    - postgres
+    - cedardb
+    - monetdb
+  interim_execution_override:
+    active: true
+    since_utc: "2026-02-12T00:00:00Z"
+    applies_until: "until further notice"
+    note: "PostgreSQL is temporarily excluded due to runtime constraints; will be reintroduced for final evaluation."
+    included_engines:
+      - duckdb
+      - cedardb
+      - monetdb
+    excluded_engines:
+      - postgres
+  exclusions:
+    - clickhouse
+  versions:
+    duckdb:
+      binary_path: /usr/local/bin/duckdb
+      version: "v1.4.4 (Andium) 6ddac802ff"
+    postgres:
+      binary_path: /usr/bin/psql
+      version: "psql (PostgreSQL) 16.11 (Ubuntu 16.11-0ubuntu0.24.04.1)"
+    cedardb:
+      binary_path: /usr/local/bin/cedardb
+      version: "CedarDB version v2026-02-03 (2026-01-29, format 0)"
+    monetdb:
+      binary_path: /usr/bin/mserver5
+      control_binary_path: /usr/bin/monetdbd
+      cli_binary_path: /usr/bin/monetdb
+      version: "MonetDB 5 server 11.55.1 (Dec2025) (64-bit, 128-bit integers)"
+
+paths:
+  data_roots:
+    tpcds_sf10: $DATA_ROOT/tpcds/sf10
+    prodds_sf10_str1: $DATA_ROOT/prodds/sf10/str1
+    prodds_sf10_str10: $DATA_ROOT/prodds/sf10/str10
+    sf100_tpcds_baseline_shared: $DATA_ROOT/prodds/sf100/str1
+    sf100_prodds_str1: $DATA_ROOT/prodds/sf100/str1
+    sf100_prodds_str10: $DATA_ROOT/prodds/sf100/str10
+  query_roots:
+    canonical_namespace: $REPO_ROOT/queries
+    variants_namespace: experiments/queries/<engine>/<suite>
+    mapping_file: experiments/queries/query_mapping.yaml
+  scaling_queries:
+    join_dir: $QUERY_DIR/prodds/generators/join
+    union_dir: $QUERY_DIR/prodds/generators/union
+
+interim_e1_3eng_freeze:
+  active: true
+  frozen_at_utc: "2026-02-12T12:21:37Z"
+  scope_engines: [duckdb, cedardb, monetdb]
+  tpcds_sf10:
+    subset_path: experiments/artifacts/E1/common_subset_3engines/tpcds_sf10.json
+    common_subset_count: 98
+    exclusion_notes:
+      - "query_0.sql excluded by protocol."
+      - "query_3.sql excluded: MonetDB runtime conversion error."
+  prodds_sf10_str10:
+    subset_path: experiments/artifacts/E1/common_subset_3engines/prodds_sf10_str10.json
+    common_subset_count: 91
+    inclusion_rule: "Intersection of SUCCESS across duckdb + cedardb + monetdb (monetdb rerun after syntax-only fix)."
+    exclusion_reasons_embedded_in_subset_json: true
+  seeds:
+    shared_overrides_path: experiments/artifacts/E1/seeds/seed_overrides_sf10_str10.yml
+    tpcds_overrides_path: experiments/artifacts/E1/seeds/seed_overrides_sf10_tpcds.yml
+    nonempty_audit_summary_path: experiments/artifacts/E1/seeds/nonempty_audit_prodds_subset_3eng_summary.json
+    shared_across_engines: true
+    additional_overrides_required: false
+
+e2_fast_track:
+  active: true
+  run_root: results/20260212T124333Z_E2
+  artifacts_root: experiments/artifacts/E2
+  scope_engines: [duckdb, cedardb, monetdb]
+  postgres_status: "temporarily excluded due to runtime constraints; reintroduce for final evaluation."
+  timeout_seconds: 1800
+  threading:
+    baseline_threads: 56
+    optional_full_core_threads: 112
+  common_subset_paths:
+    tpcds_sf10: experiments/artifacts/E1/common_subset_3engines/tpcds_sf10.json
+    prodds_sf10_str10: experiments/artifacts/E1/common_subset_3engines/prodds_sf10_str10.json
+  fast_subset_paths:
+    tpcds_sf10: experiments/artifacts/E2/fast_subset/tpcds_sf10.json
+    prodds_sf10_str10: experiments/artifacts/E2/fast_subset/prodds_sf10_str10.json
+  fast_subset_rule: "A query is in fast subset iff it is in common subset and median execution time is < 60s on all three active engines."
+  metric_scope:
+    primary_metrics:
+      - end_to_end_workload_time
+      - per_query_execution_time
+    deferred_to_e3:
+      - join_scaling
+      - planning_time
+  deep_dive_engine:
+    engine: duckdb
+    purpose: planning_time_instrumentation
+
+e3_join_scaling:
+  active: true
+  completed_at_utc: "2026-02-15T17:19:32Z"
+  artifacts_root: experiments/artifacts/E3
+  scope_engines: [duckdb, cedardb, monetdb]
+  postgres_status: "temporarily excluded due to runtime constraints; reintroduce for final evaluation."
+  query_root: $QUERY_DIR/prodds/generators/join
+  join_levels: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+  generator_calibration:
+    config_path: workload/config/returns.yml
+    effective_join_formula: "J(k,m)=(m+1)*(b+k*(b+1))+m"
+    base_join_width_b: 10
+    low_target_note: "targets below b are not exactly reachable and use nearest calibrated override"
+    target_overrides_required: true
+    refresh_command: "python3 tools/regenerate_join_scaling_queries.py --levels 1,2,4,8,16,32,64,128,256,512,1024,2048"
+    validate_header_metadata: true
+    expected_strategy: target_override
+  timeout_seconds: 1800
+  threading:
+    baseline_threads: 56
+    optional_full_core_threads: 112
+  outputs:
+    overview: experiments/artifacts/E3/overview.md
+    summary_csv: experiments/artifacts/E3/merged/per_level_medians.csv
+    join_levels_json: experiments/artifacts/E3/join_levels.json
+    checksums_tsv: experiments/artifacts/E3/checksums_join_queries.tsv
+    duckdb_csv: experiments/artifacts/E3/merged/duckdb_join_scaling.csv
+    cedardb_csv: experiments/artifacts/E3/merged/cedardb_join_scaling.csv
+    monetdb_csv: experiments/artifacts/E3/merged/monetdb_join_scaling.csv
+  planning_collection_policy:
+    duckdb: "required deep-dive; EXPLAIN (ANALYZE, FORMAT JSON) raw outputs stored; planning proxy via EXPLAIN wall-clock."
+    cedardb: "best-effort planning proxy via EXPLAIN wall-clock."
+    monetdb: "best-effort planning proxy via EXPLAIN wall-clock."
+  planning_ratio:
+    expression: "planning_ratio = planning_time_ms / total_time_ms"
+    reported_in: experiments/artifacts/E3/merged/per_level_medians.csv
+
+e5_duckdb_stringification_sweep:
+  active: true
+  status: "specified_for_execution"
+  artifacts_root: experiments/artifacts/E5
+  engine: duckdb
+  scope_engines: [duckdb]
+  postgres_status: "excluded from E5"
+  suite: prodds_sf10
+  sf: 10
+  str_levels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  data_roots_policy:
+    expected_pattern: $DATA_ROOT/prodds/sf10/str<S>
+    required_all_levels: true
+    required_levels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    fallback_to_str10_for_missing_levels: false
+  query_policy:
+    canonical_root_pattern: $QUERY_DIR/prodds/sf10/str<S>
+    include_pattern: "query_<N>.sql (numeric only)"
+    exclude:
+      - query_0.sql
+    pure_data_mode: false
+    query_text_invariant_across_str: false
+    disallow_level_dependent_ext_templates: false
+    generator_command_requires:
+      - --stringification-level
+  runtime_provenance:
+    required_per_point:
+      - query_path
+      - query_sha256
+      - query_sha256_normalized
+      - data_root
+      - db_path
+  timeout_seconds: 1800
+  threading:
+    baseline_threads: 56
+    optional_full_core_threads: 112
+    duckdb_set:
+      - "PRAGMA threads=56;"
+    duckdb_verify:
+      - "SELECT current_setting('threads');"
+  statistics_phase:
+    required: true
+    command: "ANALYZE;"
+    per_str_level: true
+  preflight:
+    full_query_set_once_per_str: true
+    enforce_non_empty: true
+    stop_if_failure_rate_gt: 0.10
+  selection:
+    selected_query_count: 3
+    requires_rubric: true
+    requires_diversity: true
+  timing:
+    warmup: 1
+    reps: 5
+    report_metric: median_runtime_seconds
+  seeds:
+    dir: experiments/artifacts/E5/seeds
+    per_level_pattern: experiments/artifacts/E5/seeds/seed_overrides_sf10_str<S>.yml
+    manifest: experiments/artifacts/E5/seeds/seed_overrides_manifest.yml
+  outputs:
+    overview: experiments/artifacts/E5/overview.md
+    preflight_matrix: experiments/artifacts/E5/preflight_matrix.csv
+    selected_queries: experiments/artifacts/E5/selected_queries.json
+    sweep_results: experiments/artifacts/E5/sweep_results.csv
+    failures: experiments/artifacts/E5/failures.csv
+    plots_dir: experiments/artifacts/E5/plots
+
+e5_new_extended_stringification:
+  active: false
+  status: "optional_extension"
+  artifacts_root: experiments/artifacts/E5_new
+  engine: duckdb
+  scope_engines: [duckdb]
+  suite: prodds_sf10
+  sf: 10
+  str_range:
+    min: 1
+    max_default: 15
+    max_supported: 20
+  str_plus:
+    required_for_gt_10: true
+    pad_step_default: 2
+    separator_default: "~"
+    marker_default: "X"
+  data_roots_policy:
+    expected_pattern: $DATA_ROOT/prodds/sf10/str<S>
+    required_levels: "1..STR_MAX"
+    generate_missing_levels: true
+    generation_must_log_manifest: true
+  query_policy:
+    selected_queries_source: experiments/artifacts/E5/selected_queries.json
+    include_additional_candidates_optional: true
+    per_level_generation_required: true
+    generator_command_requires:
+      - --stringification-level
+      - --stringification-level supports 1-15 natively
+  runtime:
+    warmup: 1
+    reps: 5
+    timeout_seconds: 1800
+    one_engine_at_a_time_guard: tools/preflight_one_engine.sh
+    statistics_phase:
+      required: true
+      command: "ANALYZE;"
+      per_str_level: true
+  threading:
+    baseline_threads: 56
+    duckdb_set:
+      - "PRAGMA threads=56;"
+    duckdb_verify:
+      - "SELECT current_setting('threads');"
+  outputs:
+    merged_raw_times: experiments/artifacts/E5_new/merged/raw_times.csv
+    merged_per_str_medians: experiments/artifacts/E5_new/merged/per_str_medians.csv
+    merged_failures: experiments/artifacts/E5_new/merged/failures.csv
+    intensity_metrics: experiments/artifacts/E5_new/intensity_metrics.csv
+    run_manifest: experiments/artifacts/E5_new/run_manifest.json
+    environment_snapshot: experiments/artifacts/E5_new/environment_snapshot.md
+    effective_config: experiments/artifacts/E5_new/effective_config/duckdb.json
+    plots:
+      - experiments/artifacts/E5_new/plots/e5new_normalized_total_vs_str_1_10_duckdb.pdf
+      - experiments/artifacts/E5_new/plots/e5new_normalized_total_vs_str_1_15_duckdb.pdf
+      - experiments/artifacts/E5_new/plots/e5new_normalized_total_vs_str_1_10_duckdb_top3.pdf
+      - experiments/artifacts/E5_new/plots/e5new_normalized_total_vs_str_1_15_duckdb_top3.pdf
+
+e6_result_verification:
+  active: true
+  status: "required_after_e5_data_query_rerun"
+  artifacts_root: experiments/artifacts/E6
+  engine: duckdb
+  based_on: E5_selected_queries
+  based_on_path: experiments/artifacts/E5/selected_queries.json
+  verification:
+    deterministic_wrapper: true
+    fingerprint: sha256
+    repetitions: 5
+    warmup: 1
+    compare_baseline: str1
+    mismatch_classes: [FORMAT_ONLY, ORDERING_ONLY, TRUE_SEMANTIC_CHANGE]
+    stop_on_true_semantic_change: true
+  outputs:
+    overview: experiments/artifacts/E6/overview.md
+    verification_matrix: experiments/artifacts/E6/verification_matrix.csv
+    fingerprints_dir: experiments/artifacts/E6/fingerprints
+    diffs_dir: experiments/artifacts/E6/diffs
+    progress_log: experiments/artifacts/E6/progress.log
+    commands_log: experiments/artifacts/E6/commands.log
+
+statistics_phase:
+  enabled: true
+  timed: false
+  required_before:
+    - audit
+    - calibration
+    - workload_compare
+    - join_scaling
+    - stringification
+  commands:
+    postgres:
+      - "ANALYZE;"
+    duckdb:
+      - "ANALYZE;"
+    monetdb:
+      - "ANALYZE;"
+    cedardb:
+      - "ANALYZE;"
+  notes:
+    cedardb: "Adaptive statistics; ANALYZE included for protocol symmetry."
+
+execution_policy:
+  statistics_must_run_before_timing: true
+
+policies:
+  preflight:
+    mandatory: true
+    script: tools/preflight_one_engine.sh
+    rule: at_most_one_engine_active
+  execution:
+    node_mode: single_node
+    query_mode: single_query_serial
+    one_engine_at_a_time: true
+    statistics_must_run_before_timing: true
+    warmup_passes: 1
+    timed_repetitions: 10
+    timed_repetitions_postgres: 3
+  data:
+    copying_allowed: false
+    forbidden_in_repo_data_pattern: experiments/plan_runs/**/data
+  query:
+    execute_query_0: false
+    union_level_1_execute: false
+    scaling_levels:
+      join_active: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+      union_active: [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+      union_deprecated: [1]
+  threading:
+    baseline: physical_cores
+    baseline_threads: 56
+    full_core:
+      enabled_optional: true
+      logical_cpu_target: 112
+    engines:
+      duckdb:
+        set_baseline:
+          - "PRAGMA threads=56;"
+        set_full_core:
+          - "PRAGMA threads=112;"
+        verify:
+          - "duckdb -noheader -csv :memory: -c \"SELECT current_setting('threads');\""
+      postgres:
+        set_session_baseline:
+          - "SET max_parallel_workers_per_gather=56;"
+          - "SET max_parallel_workers=56;"
+        set_postmaster_baseline:
+          - "ALTER SYSTEM SET max_worker_processes=56;"
+        set_session_full_core:
+          - "SET max_parallel_workers_per_gather=112;"
+          - "SET max_parallel_workers=112;"
+        set_postmaster_full_core:
+          - "ALTER SYSTEM SET max_worker_processes=112;"
+        requires_restart_for_postmaster: true
+        verify:
+          - "psql -At -d postgres -c \"SHOW max_parallel_workers_per_gather; SHOW max_parallel_workers; SHOW max_worker_processes;\""
+      monetdb:
+        set_baseline:
+          - "monetdb set nthreads=56 <db>"
+        set_full_core:
+          - "monetdb set nthreads=112 <db>"
+        verify:
+          - "monetdb get nthreads <db>"
+        note: verification_may_require_stable_daemon_db_state
+      cedardb:
+        set_target:
+          - "parallel=\"56\" (or env equivalent)"
+        set_target_full_core:
+          - "parallel=\"112\" (or env equivalent)"
+        verify:
+          - "DELEGATED: vendor-authoritative runtime verification required"
+  timeout:
+    T_seconds: null
+    freeze_rule:
+      expression: "T = max_successful_calibration_runtime + 60"
+      frozen_in_experiment: E1
+    near_timeout_exclusion:
+      enabled: true
+      threshold_seconds: 60
+      applies_to: common_subset
+  errors:
+    primary_statuses: [SUCCESS, TIMEOUT, ERROR]
+    error_subclasses: [OOM, FAILURE, DIALECT, PARSE, UNKNOWN]
+
+artifacts:
+  required_per_run:
+    - raw_times.csv
+    - failures.csv
+    - audit.json
+    - run_manifest.json
+    - environment_snapshot.md
+    - effective_config.json
+  additional_required_outputs:
+    - results/<ts>/common_subset.md
+  effective_config:
+    postgres:
+      required_capture:
+        - "SHOW ALL"
+    duckdb:
+      required_capture:
+        - "duckdb --version"
+        - "effective PRAGMAs used in the run (including threads)"
+    monetdb:
+      preferred_capture:
+        - "monetdb get all <db>"
+      fallback_capture:
+        - "monetdb status"
+        - "monetdb get nthreads <db>"
+        - "any available property listing output"
+      limitation_handling: record_as_delegated_if_unavailable
+    cedardb:
+      required_capture:
+        - "effective config dump if available"
+      limitation_handling: record_as_delegated_if_unavailable
+
+delegated_questions:
+  owner: "Maximillian Bandle (CedarDB)"
+  questions:
+    - "What is the authoritative way to set `parallel` at runtime versus config file?"
+    - "What is the authoritative way to verify effective parallelism during a running query?"
+    - "What is the authoritative way to dump effective CedarDB configuration (all parameters)?"
+
+experiments:
+  - id: E0
+    name: setup
+    required: true
+    default_enabled: false
+    status: completed
+    inputs:
+      - environment
+      - engine_installs
+      - scaling_query_materialization
+    outputs:
+      - protocol_manifest.json
+      - engines_versions.json
+      - threads.json
+      - queries_inventory.md
+  - id: E1
+    name: audit_and_timeout_freeze
+    required: true
+    default_enabled: true
+    inputs:
+      - audit_with_timeout_workflow
+      - full_query_sets
+    outputs:
+      - results/<ts>/common_subset.md
+      - timeout_freeze_record
+    rules:
+      - freeze_timeout_T_using_policy
+      - apply_near_timeout_exclusion
+  - id: E2
+    name: timing_common_subset
+    required: true
+    default_enabled: true
+    suites: [tpcds_sf10, prodds_sf10_str10]
+    outputs:
+      - per_query_medians
+      - workload_median_totals
+      - fast_subset
+  - id: E3
+    name: join_deep_dive
+    required: true
+    default_enabled: true
+    scope_engines: [duckdb, cedardb, monetdb]
+    postgres_excluded: true
+    query_root: $QUERY_DIR/prodds/generators/join
+    join_levels: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+    timeout_seconds: 1800
+    baseline_threads: 56
+    outputs:
+      - join_scaling
+      - planning_time_instrumentation
+      - planning_ratio
+  - id: E4
+    name: stringification_sweep
+    required: true
+    default_enabled: true
+    inputs:
+      - sf10
+      - fixed_query_selected_by_documented_heuristic
+    outputs:
+      - sweep_str1_to_str10
+      - fixed_query_record_in_manifest
+  - id: E5
+    name: duckdb_stringification_sweep
+    required: true
+    default_enabled: true
+    engine: duckdb
+    sf: 10
+    str_levels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    timeout_seconds: 1800
+    warmup: 1
+    reps: 5
+    query_policy:
+      include_numeric_queries_only: true
+      exclude: [query_0.sql]
+      pure_data_mode: false
+      query_text_invariant_across_str: false
+    threading:
+      threads: 56
+    outputs:
+      - experiments/artifacts/E5/preflight_matrix.csv
+      - experiments/artifacts/E5/selected_queries.json
+      - experiments/artifacts/E5/sweep_results.csv
+      - experiments/artifacts/E5/plots/*
+  - id: E6
+    name: result_verification_e5_selected
+    required: true
+    default_enabled: true
+    engine: duckdb
+    based_on: E5_selected_queries
+    verification:
+      deterministic_wrapper: true
+      fingerprint: sha256
+      repetitions: 5
+      warmup: 1
+    outputs:
+      - experiments/artifacts/E6/overview.md
+      - experiments/artifacts/E6/verification_matrix.csv
+      - experiments/artifacts/E6/fingerprints/*
+  - id: E7
+    name: duckdb_sf100_sanity
+    required: false
+    optional: true
+    default_enabled: false
+  - id: E8
+    name: result_verification_common_subset
+    required: false
+    optional: true
+    default_enabled: false
+  - id: E9
+    name: plan_capture_audit
+    required: false
+    optional: true
+    default_enabled: false
+    outputs:
+      - results/<ts>/plan_capture/<engine>/<suite>/<query>.json
+    rules:
+      - separate_from_timed_experiments
+  - id: E12
+    name: sf100_paper_refresh
+    required: true
+    default_enabled: true
+    scope_engines: [duckdb, postgres, cedardb, monetdb]
+    artifacts_root: experiments/artifacts_sf100
+    rules:
+      - no_standalone_audit_run
+      - capture_errors_from_timed_runs
+      - one_engine_at_a_time
+  - id: E13
+    name: nality_q_refresh
+    required: false
+    optional: true
+    default_enabled: false
+    notes:
+      - optional track; out of paper-critical SF100 scope
+
+sf100_campaign_2026_02_27:
+  active: true
+  artifacts_root: experiments/artifacts_sf100
+  human_plan: experiments/artifacts_sf100/README.md
+  machine_plan: experiments/artifacts_sf100/plan.yaml
+  timing_policy:
+    warmup: 1
+    timed_repetitions_by_engine:
+      duckdb: 10
+      cedardb: 10
+      monetdb: 10
+      postgres: 3
+  frozen_sets:
+    generated_at_utc: "2026-02-28T23:30:00Z"
+    base_rule: "Include base query iff all engines are SUCCESS or TIMEOUT (hard errors excluded)."
+    timeout_included_as_non_error: true
+    prodds_sf100_str10:
+      base_success_only_count: 80
+      base_no_error_incl_timeout_count: 90
+      standard_microsuite:
+        join_targets: [50, 100, 200]
+        union_fanin_targets: [2, 5, 10, 20, 200]
+      standard_set_count: 98
+    tpcds_sf100:
+      default_base99_count: 99
+    artifacts:
+      frozen_set_md: experiments/artifacts_sf100/frozen/sf100_frozen_standard_set.md
+      frozen_set_json: experiments/artifacts_sf100/frozen/sf100_frozen_standard_set.json
+      e2_subset_json: experiments/artifacts_sf100/frozen/e2_subset_sf100_frozen_standard.json
+  inherits_from_protocol_sections:
+    - statistics_phase
+    - policies
+    - artifacts.required_per_run
+    - policies.errors
+  bootstrap:
+    copied_results:
+      - source: experiments/artifacts/E11_DuckDB_SF100_TPCDS_vs_PRODDS_default/20260224T001642Z
+        target: experiments/artifacts_sf100/bootstrap/duckdb/E11_default_20260224T001642Z
+      - source: experiments/artifacts/E11_DuckDB_SF100_TPCDS_vs_PRODDS_fullscope/20260224T112605Z
+        target: experiments/artifacts_sf100/bootstrap/duckdb/E11_fullscope_20260224T112605Z
+  no_standalone_audit_run: true
+  timed_run_error_tracking:
+    statuses: [SUCCESS, TIMEOUT, ERROR]
+    error_subclasses: [OOM, FAILURE, DIALECT, PARSE, UNKNOWN]
+  paper_scope:
+    required_metrics:
+      - median_query_runtime_common_subset
+      - workload_total_runtime_common_subset
+      - per_query_median_runtime_distribution_cdf
+      - prodds_error_breakdown_from_timed_runs
+      - join_execution_time_vs_join_level
+      - join_planning_time_vs_join_level
+      - union_runtime_vs_fan_in
+      - normalized_total_runtime_vs_stringification_level
+  status_matrix:
+    bootstrap_duckdb_sf100_end_to_end: completed
+    e2_common_subset_4eng_sf100: pending
+    e2_error_breakdown_4eng_sf100: pending
+    e3_join_scaling_4eng_sf100: pending
+    e4_union_scaling_4eng_sf100: pending
+    e5_stringification_duckdb_sf100: pending
+  prerequisites_missing:
+    - sf100_sparse_query_mapping_for_non_duckdb_engines
+    - sf100_query_directories_for_prodds_str1_to_str9
+    - sf100_data_roots_for_prodds_str2_to_str9_or_stagewise_generation
+  execution_order:
+    - freeze_bootstrap_artifacts_and_manifests
+    - prepare_sf100_sparse_mapping_for_4_engines
+    - run_common_subset_timing_4eng_with_inline_error_tracking
+    - derive_error_breakdown_from_timed_failures
+    - run_join_scaling_execution_and_planning_4eng
+    - run_union_fanin_scaling_4eng
+    - run_duckdb_stringification_stagewise_str1_to_str10
+    - rebuild_paper_plots_and_tables_from_sf100_only
+  storage_strategy:
+    one_engine_at_a_time: true
+    keep_persistent:
+      - $DATA_ROOT/prodds/sf100/str1
+      - $DATA_ROOT/prodds/sf100/str10
+    stagewise_stringification:
+      generate_missing_levels_on_demand: [2, 3, 4, 5, 6, 7, 8, 9]
+      keep_only_current_level_plus_str1_and_str10: true
+      drop_transient_level_data_after_completion: true
+      reuse_single_duckdb_db_path_per_level: true
+  optional_tracks:
+    - nality_q_refresh
