@@ -35,7 +35,7 @@ Required config:
 Generates join-heavy queries for each join count and seed, then executes them.
 
 ```
-python -m experiments run --config experiments/config.yaml --experiment join_scaling --system clickhouse
+python -m experiments run --config experiments/config.yaml --experiment join_scaling --system duckdb
 ```
 
 Required config:
@@ -48,7 +48,7 @@ Optional:
 Generates Prod-DS queries for each stringification level and executes them.
 
 ```
-python -m experiments run --config experiments/config.yaml --experiment string_sweep --system postgres
+python -m experiments run --config experiments/config.yaml --experiment string_sweep --system duckdb
 ```
 
 Required config:

@@ -1,13 +1,13 @@
 [build-system]
 requires = ["setuptools>=68.0"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "proddskit"
-version = "0.1.0"
+version = "1.0.0"
 description = "A data- and query-centric extension to TPC-DS for production-realistic benchmarking."
 readme = "README.md"
-license = {file = "LICENSE"}
+license-files = ["LICENSE"]
 requires-python = ">=3.9"
 authors = [
     {name = "Jan Vincent Szlang", email = "jvs34@cam.ac.uk"},
@@ -26,6 +26,9 @@ test = [
 
 [project.scripts]
 prodds-kit = "prodds_kit:main"
+
+[tool.setuptools.packages.find]
+include = ["workload*", "experiments*", "prodds_kit*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

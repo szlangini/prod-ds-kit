@@ -74,7 +74,12 @@ case "$(uname -s)" in
     *)       fail "Unsupported OS: $(uname -s). Supported: Linux, macOS." ;;
 esac
 
-(cd "$TPCDS_KIT_DIR/tools" && make clean >/dev/null 2>&1 || true && make OS="$OS_FLAG" -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)" >/dev/null 2>&1)
+# Modern clang rejects old K&R-style C; add permissive flags
+EXTRA_CFLAGS=""
+if cc -Wno-implicit-int -x c -c /dev/null -o /dev/null 2>/dev/null; then
+    EXTRA_CFLAGS="-Wno-implicit-int -Wno-implicit-function-declaration -Wno-return-type"
+fi
+(cd "$TPCDS_KIT_DIR/tools" && make clean >/dev/null 2>&1 || true && make OS="$OS_FLAG" MACOS_CFLAGS="-g -Wall ${EXTRA_CFLAGS}" LINUX_CFLAGS="-g -Wall ${EXTRA_CFLAGS}" -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)" >/dev/null 2>&1)
 ok "TPC-DS tools built for $OS_FLAG."
 
 # ---------- Step 6: Verify binaries ----------
@@ -100,16 +105,46 @@ if [ -f "$STRINGIFY_CPP_DIR/Makefile" ]; then
     fi
 fi
 
-# ---------- Step 8: Generate templates.lst ----------
+# ---------- Step 8: Bootstrap schema files ----------
+if [ ! -f "$REPO_ROOT/tools/tpcds.sql" ]; then
+    info "Copying TPC-DS base schema to tools/tpcds.sql..."
+    cp "$TPCDS_KIT_DIR/tools/tpcds.sql" "$REPO_ROOT/tools/tpcds.sql"
+    ok "tools/tpcds.sql copied."
+else
+    info "tools/tpcds.sql already present."
+fi
+
+if [ ! -f "$REPO_ROOT/tools/prodds.sql" ]; then
+    info "Bootstrapping tools/prodds.sql from TPC-DS base schema..."
+    cp "$TPCDS_KIT_DIR/tools/tpcds.sql" "$REPO_ROOT/tools/prodds.sql"
+    "$PYTHON" "$REPO_ROOT/tools/update_prodds_schema.py" \
+        --base-schema "$TPCDS_KIT_DIR/tools/tpcds.sql" \
+        --prod-schema "$REPO_ROOT/tools/prodds.sql" >/dev/null 2>&1
+    ok "tools/prodds.sql generated."
+else
+    info "tools/prodds.sql already present."
+fi
+
 info "Generating query_templates/templates.lst from TPC-DS toolkit..."
 if [ -f "$TPCDS_KIT_DIR/query_templates/templates.lst" ]; then
     cp "$TPCDS_KIT_DIR/query_templates/templates.lst" "$REPO_ROOT/query_templates/templates.lst"
     ok "templates.lst copied from TPC-DS toolkit."
 else
-    # Generate from directory listing
     (cd "$TPCDS_KIT_DIR/query_templates" && ls query*.tpl 2>/dev/null | sort -V > "$REPO_ROOT/query_templates/templates.lst")
     ok "templates.lst generated from TPC-DS template directory."
 fi
+
+# Copy all base TPC-DS templates (query*.tpl + dialect/helper templates)
+info "Copying base TPC-DS templates into query_templates/..."
+COPIED=0
+for tpl in "$TPCDS_KIT_DIR"/query_templates/*.tpl; do
+    base="$(basename "$tpl")"
+    if [ ! -f "$REPO_ROOT/query_templates/$base" ]; then
+        cp "$tpl" "$REPO_ROOT/query_templates/$base"
+        COPIED=$((COPIED + 1))
+    fi
+done
+ok "Copied $COPIED base TPC-DS templates."
 
 # ---------- Step 9: Smoke test ----------
 info "Running smoke test..."
@@ -129,6 +164,6 @@ echo "  dsqgen:          $TPCDS_KIT_DIR/tools/dsqgen"
 echo ""
 echo "  Quick start:"
 echo "    source .venv/bin/activate"
-echo "    python3 wrap_dsdgen.py --stringification-level 10 -DIR ./data/sf1 -SCALE 1"
-echo "    python3 wrap_dsqgen.py --output-dir ./queries/sf1"
+echo "    python3 wrap_dsdgen.py --default"
+echo "    python3 wrap_dsqgen.py --output-dir ./queries --stringification-level 10"
 echo ""

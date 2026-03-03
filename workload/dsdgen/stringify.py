@@ -616,7 +616,7 @@ def _load_ndv_map(
         min_ndv = int(raw_min_ndv)
     except (TypeError, ValueError):
         min_ndv = MIN_NDV_FOR_INJECTION
-    min_ndv = max(1, min_ndv)
+    min_ndv = max(0, min_ndv)
 
     scale_factor = _infer_scale_factor(cfg, source_data_dir=source_data_dir)
     reference_db = _resolve_ndv_reference_duckdb(
@@ -625,9 +625,13 @@ def _load_ndv_map(
         scale_factor=scale_factor,
     )
     if reference_db is None:
+        if min_ndv <= 0:
+            # NDV guard disabled -- skip cardinality check, inject into all eligible columns
+            return {}, 0, Path("/dev/null"), Path("/dev/null"), scale_factor
         raise RuntimeError(
             "NDV guard requires a baseline DuckDB file. "
-            "Set --ndv-reference-duckdb or PRODDS_NDV_DUCKDB."
+            "Set --ndv-reference-duckdb or PRODDS_NDV_DUCKDB, "
+            "or set --min-ndv-for-injection 0 to skip the guard."
         )
 
     raw_cache_dir = cfg.get("ndv_cache_dir") or os.getenv("PRODDS_NDV_CACHE_DIR")

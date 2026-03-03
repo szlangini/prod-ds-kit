@@ -20,7 +20,7 @@ formulas, and worked examples from the paper appendices:
 | D | [docs/null-profiles.md](docs/null-profiles.md) | Profile tuple P=(f,B,E), 4-step BLAKE2b assignment, three sparsity tiers with bucket definitions |
 | E | [docs/mcv-profiles.md](docs/mcv-profiles.md) | Profile tuple M=(f,B20,Br,E), dominance ratios, three skew tiers, injection ordering |
 | -- | [docs/experimental-protocol.md](docs/experimental-protocol.md) | Frozen evaluation protocol (E1-E10), engine versions, host spec, timeout policy, error taxonomy |
-| -- | [docs/dialect-adaptations.md](docs/dialect-adaptations.md) | Per-engine SQL rewrites for DuckDB, PostgreSQL, CedarDB, MonetDB; adding a new dialect |
+| -- | [docs/dialect-adaptations.md](docs/dialect-adaptations.md) | Per-engine SQL rewrites for DuckDB, CedarDB, MonetDB; adding a new dialect |
 
 ## Quick Start
 
@@ -29,20 +29,33 @@ git clone https://github.com/szlangini/prod-ds-kit.git
 cd prod-ds-kit
 ./install.sh
 source .venv/bin/activate
+```
 
-# Generate production-realistic data (STR=10, NULL/MCV medium)
-python3 wrap_dsdgen.py --stringification-level 10 \
-    --null-profile medium --mcv-profile medium \
-    -DIR ./data/sf1_str10 -SCALE 1
+### Default Commands
 
-# Generate extended queries
-python3 wrap_dsqgen.py --output-dir ./queries/sf1_str10 \
-    --stringification-level 10
+The `--default` flag uses recommended settings: **STR=10, NULL=medium, MCV=medium, SF=10, output=./output**.
+
+```bash
+# Generate data with all defaults (STR=10, NULL medium, MCV medium, SF=10)
+python3 wrap_dsdgen.py --default
+
+# Generate extended queries for the default data
+python3 wrap_dsqgen.py --output-dir ./queries --stringification-level 10
 
 # Run the benchmark (DuckDB, no server required)
 python -m experiments run \
     --config experiments/config.example.yaml \
     --experiment workload_compare --system duckdb
+```
+
+You can override individual defaults:
+
+```bash
+# Default settings but at SF=1 (smaller, faster)
+python3 wrap_dsdgen.py --default -SCALE 1
+
+# Default settings but at SF=100
+python3 wrap_dsdgen.py --default -SCALE 100
 ```
 
 For a fully automated end-to-end walkthrough, see `examples/quickstart/run.sh`.
@@ -57,12 +70,29 @@ For a fully automated end-to-end walkthrough, see `examples/quickstart/run.sh`.
 # One-command setup:
 ./install.sh
 
-# Generate data + queries + run benchmark:
+# Generate data + queries with defaults:
 source .venv/bin/activate
-python3 wrap_dsdgen.py --stringification-level 10 -DIR ./data/sf1 -SCALE 1
-python3 wrap_dsqgen.py --output-dir ./queries/sf1 --stringification-level 10
+python3 wrap_dsdgen.py --default
+python3 wrap_dsqgen.py --output-dir ./queries --stringification-level 10
 python -m experiments run --help   # see all runner options
 ```
+
+### Agent Prompt (Copy-Paste)
+
+Give this prompt to an AI coding agent (e.g. Claude Code, Cursor, Copilot) to
+set up and run Prod-DS Kit end-to-end with DuckDB:
+
+> Clone the Prod-DS Kit repository from https://github.com/szlangini/prod-ds-kit.git
+> and run `./install.sh` to build the TPC-DS toolkit. Activate the virtual
+> environment with `source .venv/bin/activate`. Verify that `dsdgen` and `dsqgen`
+> binaries exist in `tpcds-kit/tools/`. Check that `python3 -c "from workload
+> import stringification"` succeeds. Then generate data using
+> `python3 wrap_dsdgen.py --default -SCALE 1` (uses STR=10, NULL=medium,
+> MCV=medium). Generate queries with `python3 wrap_dsqgen.py --output-dir ./queries
+> --stringification-level 10`. Verify that `./output/` contains `.dat` files and
+> `./queries/` contains `.sql` files. Finally, run the DuckDB benchmark:
+> `python -m experiments run --config experiments/config.example.yaml
+> --experiment workload_compare --system duckdb`. Report any errors encountered.
 
 ## Extension Parameters
 
@@ -71,7 +101,7 @@ python -m experiments run --help   # see all runner options
 | Flag | Values | Default | Effect |
 |------|--------|---------|--------|
 | `--stringification-level` | 1-15 | 10 | Columns recast to strings (1-10) and per-value padding width; STR>10 extends string length only (column set frozen at STR=10) |
-| `--stringification-preset` | `vanilla`, `low`, `medium`, `high`, `production` | none | Named shortcut for stringification level |
+| `--stringification-preset` | `vanilla` (STR 1), `low` (STR 3), `medium` (STR 5), `high` (STR 7), `production` (STR 10) | none | Named shortcut for stringification level |
 | `--null-profile` | `low`, `medium`, `high` | none (no NULLs) | Fleet-derived NULL sparsity tier injected into eligible columns |
 | `--mcv-profile` | `low`, `medium`, `high` | none (no MCV) | Fleet-derived MCV skew tier injected into eligible columns |
 | `-SCALE` | integer | 1 | TPC-DS scale factor (1, 10, 100, ...) |
@@ -84,7 +114,7 @@ python -m experiments run --help   # see all runner options
 | `--output-dir` | path | required | Output directory for generated SQL files |
 | `--stringification-level` | 1-15 | none | Activates extended templates and literal post-processing for the given STR level |
 | `--no-extensions` | flag | off | Use base TPC-DS templates only (skip `*_ext.tpl`) |
-| `--dialect` | `ansi`, `duckdb`, `postgres` | `ansi` | SQL dialect for dsqgen output |
+| `--dialect` | `ansi`, `duckdb` | `ansi` | SQL dialect for dsqgen output |
 | `--join` / `--no-join` | flag | on | Include/exclude join-amplified queries |
 | `--join-targets` | comma-separated ints | `50,100,200` | Target effective join counts for generated join queries |
 | `--union` / `--no-union` | flag | on | Include/exclude UNION ALL fan-in queries |
@@ -98,7 +128,7 @@ python -m experiments run --help   # see all runner options
 |-----------|-----|-------------------|------|-------------|
 | NULL sparsity | ~5% columns, light rates | ~30% columns, fleet-derived rates | ~60% columns, heavy rates | `config/null_profiles.yml` |
 | MCV skew | ~20% columns, mild dominance | ~70% columns, fleet-derived dominance | ~90% columns, strong dominance | `config/mcv_profiles.yml` |
-| Stringification | STR=1 (0 columns recast) | STR=5 (65 columns) | STR=10 (131 columns) | `config/string_profiles.yml` |
+| Stringification | vanilla (STR 1): 0 columns recast | medium (STR 5): 65 columns | production (STR 10): 131 columns | `config/string_profiles.yml` |
 
 ### Benchmark runner (`python -m experiments run`)
 
@@ -106,7 +136,7 @@ python -m experiments run --help   # see all runner options
 |------|--------|---------|--------|
 | `--config` | path | required | YAML config file (see `experiments/config.example.yaml`) |
 | `--experiment` | `workload_compare`, `join_scaling`, `string_sweep` | required | Which experiment to execute |
-| `--system` | `duckdb`, `postgres`, `cedardb`, `monetdb` | required | Target engine |
+| `--system` | `duckdb`, `cedardb`, `monetdb` | required | Target engine |
 
 See `experiments/config.example.yaml` for the full configuration schema
 including threading, memory limits, timeouts, and repetition counts.
@@ -157,7 +187,7 @@ is automatically selected based on the active stringification level.
 
 ## Supported Engines
 
-DuckDB, PostgreSQL, CedarDB, MonetDB.
+DuckDB, CedarDB, MonetDB.
 
 Engine adapters are in `experiments/adapters/`. Adding a new engine requires
 implementing the adapter interface in `experiments/adapters/base.py`.

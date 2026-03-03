@@ -131,6 +131,11 @@ def _parse_wrapper_args(argv: Sequence[str]) -> Tuple[argparse.Namespace, List[s
     parser.add_argument(
         "--rewrite-max-workers", type=int, help="Cap worker threads used during rewrite stage."
     )
+    parser.add_argument(
+        "--default",
+        action="store_true",
+        help="Use recommended defaults: STR=10, NULL medium, MCV medium, SF=10, output ./output.",
+    )
 
     parsed, passthrough = parser.parse_known_args(argv)
     return parsed, passthrough
@@ -258,6 +263,33 @@ def _run_rewrite(
 
 def main(argv: Sequence[str]) -> int:
     parsed, passthrough = _parse_wrapper_args(argv)
+
+    # --default: STR=10, NULL medium, MCV medium, SF=10, output ./output
+    if parsed.default:
+        if parsed.stringification_level is None and parsed.stringification_preset is None and parsed.stringify is None:
+            parsed.stringification_level = 10
+        if parsed.null_profile is None:
+            parsed.null_profile = "medium"
+        if parsed.mcv_profile is None:
+            parsed.mcv_profile = "medium"
+        # Skip NDV guard for quick-start (no pre-built DuckDB reference needed)
+        if parsed.min_ndv_for_injection is None:
+            parsed.min_ndv_for_injection = 0
+        # Inject -SCALE 10 and -DIR ./output if not already specified
+        has_scale = any(t.upper() in ("-SCALE", "--SCALE") or t.upper().startswith("-SCALE=") for t in passthrough)
+        if not has_scale:
+            passthrough = passthrough + ["-SCALE", "10"]
+        has_dir = any(t.lower() in ("-dir", "--dir", "-directory", "--directory") or t.lower().startswith(("-dir=", "--dir=")) for t in passthrough)
+        if not has_dir:
+            default_out = Path("./output").resolve()
+            default_out.mkdir(parents=True, exist_ok=True)
+            passthrough = passthrough + ["-DIR", str(default_out)]
+        # Add FORCE so re-runs don't fail
+        has_force = any(t.upper() in ("-FORCE", "--FORCE") for t in passthrough)
+        if not has_force:
+            passthrough = passthrough + ["-FORCE"]
+        print("[default] Using recommended defaults: STR=10, NULL=medium, MCV=medium, SF=10, DIR=./output")
+
     stringify_level = parsed.stringification_level
     stringify_preset = parsed.stringification_preset
     if stringify_level is not None and stringify_preset is not None:

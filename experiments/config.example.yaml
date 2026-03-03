@@ -42,39 +42,6 @@ engines:
       volumes:
         - /path/to:/data
 
-  clickhouse:
-    enabled: true
-    load_command: "bash /path/to/load_clickhouse.sh"
-    native:
-      host: localhost
-      port: 9000
-      user: default
-      password: ""
-      start_command: "sudo systemctl start clickhouse-server"
-      stop_command: "sudo systemctl stop clickhouse-server"
-    docker:
-      image: clickhouse/clickhouse-server:latest
-      container_name: experiments-clickhouse
-      ports: ["9000:9000", "8123:8123"]
-
-  postgres:
-    enabled: true
-    load_command: "bash /path/to/load_postgres.sh"
-    native:
-      host: localhost
-      port: 5432
-      user: postgres
-      dbname: prodds
-      start_command: "sudo systemctl start postgresql"
-      stop_command: "sudo systemctl stop postgresql"
-    docker:
-      image: postgres:16
-      container_name: experiments-postgres
-      ports: ["5432:5432"]
-      env:
-        POSTGRES_PASSWORD: postgres
-        POSTGRES_DB: prodds
-
   cedardb:
     enabled: true
     load_command: "bash /path/to/load_cedardb.sh"

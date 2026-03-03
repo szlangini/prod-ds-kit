@@ -16,6 +16,22 @@ workload/dsdgen/stringify_cpp
 # Data folders (generated)
 data/
 data_utf8/
+output/
+snowflake_run/
+
+# Generated schema files (created by install.sh)
+tools/tpcds.sql
+tools/prodds.sql
+
+# Base TPC-DS templates copied by install.sh (only *_ext.tpl are ours)
+query_templates/query[0-9]*.tpl
+!query_templates/*_ext.tpl
+query_templates/ansi.tpl
+query_templates/netezza.tpl
+query_templates/sqlserver.tpl
+query_templates/oracle.tpl
+query_templates/db2.tpl
+query_templates/templates.lst
 
 # Generated queries
 queries/
