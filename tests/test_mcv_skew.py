@@ -30,6 +30,7 @@ class MCVSkewTests(unittest.TestCase):
         return columns, rows
 
     def _pick_table_with_mcv_rules(self, cfg: dict) -> str:
+        cfg.setdefault("min_ndv_for_injection", 0)
         injector = stringify.MCVInjector(self.schema, cfg)  # type: ignore[attr-defined]
         tables = list(injector.tables_with_rules())
         if not tables:
@@ -63,6 +64,7 @@ class MCVSkewTests(unittest.TestCase):
                 enable_nulls=False,
                 enable_mcv=True,
                 mcv_overrides=overrides,
+                min_ndv_for_injection=0,
             )
             stringify.rewrite_tbl_directory(
                 run_two,
@@ -71,6 +73,7 @@ class MCVSkewTests(unittest.TestCase):
                 enable_nulls=False,
                 enable_mcv=True,
                 mcv_overrides=overrides,
+                min_ndv_for_injection=0,
             )
 
             self.assertEqual(
@@ -107,6 +110,7 @@ class MCVSkewTests(unittest.TestCase):
                 null_marker="\\N",
                 null_overrides=null_overrides,
                 enable_mcv=False,
+                min_ndv_for_injection=0,
             )
             stringify.rewrite_tbl_directory(
                 with_mcv_disabled.parent,
@@ -117,6 +121,7 @@ class MCVSkewTests(unittest.TestCase):
                 null_overrides=null_overrides,
                 enable_mcv=True,
                 mcv_overrides=mcv_overrides,
+                min_ndv_for_injection=0,
             )
 
             self.assertEqual(without_mcv.read_bytes(), with_mcv_disabled.read_bytes())
@@ -145,6 +150,7 @@ class MCVSkewTests(unittest.TestCase):
                 enable_nulls=False,
                 enable_mcv=True,
                 mcv_overrides=overrides,
+                min_ndv_for_injection=0,
             )
 
             rewritten = path.read_text(encoding="utf-8").splitlines()
@@ -180,10 +186,12 @@ class MCVSkewTests(unittest.TestCase):
                 enable_nulls=False,
                 enable_mcv=True,
                 mcv_overrides=overrides,
+                min_ndv_for_injection=0,
             )
 
             rewritten = path.read_text(encoding="utf-8").splitlines()
             # Inspect the first column that has an MCV rule.
+            overrides["min_ndv_for_injection"] = 0
             injector = stringify.MCVInjector(self.schema, overrides)  # type: ignore[attr-defined]
             rule = injector.rules[table][0]
             counts = Counter()
@@ -238,6 +246,7 @@ class MCVTierTests(unittest.TestCase):
         for profile_name, _ in self.TIER_PROFILES:
             cfg = mcv_skew_rules(profile=profile_name)
             cfg["seed"] = seed
+            cfg["min_ndv_for_injection"] = 0
             injector = stringify.MCVInjector(self.schema, cfg)  # type: ignore[attr-defined]
             all_f20 = []
             total_cols = 0

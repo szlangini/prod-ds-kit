@@ -21,6 +21,7 @@ class NullSkewTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.schema = stringify._schema_cache()  # type: ignore[attr-defined]
         cls.default_rules = stringify.null_skew_rules()
+        cls.default_rules["min_ndv_for_injection"] = 0
 
     def _make_rows(self, table: str, row_count: int) -> tuple[list[str], list[str]]:
         columns = self.schema[table]["columns"]
@@ -57,6 +58,7 @@ class NullSkewTests(unittest.TestCase):
                 null_marker="\\N",
                 null_seed=987,
                 null_overrides=overrides,
+                min_ndv_for_injection=0,
             )
             stringify.rewrite_tbl_directory(
                 run_two,
@@ -66,6 +68,7 @@ class NullSkewTests(unittest.TestCase):
                 null_marker="\\N",
                 null_seed=987,
                 null_overrides=overrides,
+                min_ndv_for_injection=0,
             )
 
             self.assertEqual(
@@ -93,6 +96,7 @@ class NullSkewTests(unittest.TestCase):
                 enable_nulls=True,
                 null_marker="\\N",
                 null_overrides=overrides,
+                min_ndv_for_injection=0,
             )
 
             rewritten = (out_dir / f"{table}.tbl").read_text(encoding="utf-8").splitlines()
@@ -167,6 +171,7 @@ class NullSkewTests(unittest.TestCase):
             "column_selection_fraction": 0.2,
             "selection_fraction_scope": "overall",
             "buckets": [{"weight": 1.0, "min": 0.1, "max": 0.1}],
+            "min_ndv_for_injection": 0,
         }
         injector = stringify.NullInjector(self.schema, cfg)  # type: ignore[attr-defined]
         eligible_fraction = injector.eligible_fraction
@@ -197,6 +202,7 @@ class NullSkewTests(unittest.TestCase):
                 enable_nulls=True,
                 null_marker="\\N",
                 null_overrides=overrides,
+                min_ndv_for_injection=0,
             )
 
             self.assertEqual(len(tables), files)
@@ -269,6 +275,7 @@ class NullTierTests(unittest.TestCase):
         for profile_name, _ in self.TIER_PROFILES:
             cfg = null_skew_rules(profile=profile_name)
             cfg["seed"] = 42
+            cfg["min_ndv_for_injection"] = 0
             injector = stringify.NullInjector(self.schema, cfg)
             probs = []
             for table_name in injector.rules:

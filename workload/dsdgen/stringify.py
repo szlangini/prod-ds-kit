@@ -998,6 +998,7 @@ class NullInjector:
             not_nulls = {c.get("name", "").lower() for c in meta.get("not_null_columns") or []}
 
             eligible = []
+            ndv_guard_active = self.min_ndv_for_injection > 0
             for column_name in columns:
                 lowered = column_name.lower()
                 if lowered in key_like or lowered in not_nulls:
@@ -1005,17 +1006,18 @@ class NullInjector:
                 qualified = f"{table_name.lower()}.{lowered}"
                 if lowered in self.exclude_columns or qualified in self.exclude_qualified:
                     continue
-                ndv_value = self.ndv_values.get(qualified)
-                if ndv_value is None or ndv_value < self.min_ndv_for_injection:
-                    ndv_excluded.append(
-                        {
-                            "table": table_name,
-                            "column": column_name,
-                            "qualified": qualified,
-                            "ndv": ndv_value,
-                        }
-                    )
-                    continue
+                if ndv_guard_active:
+                    ndv_value = self.ndv_values.get(qualified)
+                    if ndv_value is None or ndv_value < self.min_ndv_for_injection:
+                        ndv_excluded.append(
+                            {
+                                "table": table_name,
+                                "column": column_name,
+                                "qualified": qualified,
+                                "ndv": ndv_value,
+                            }
+                        )
+                        continue
                 eligible.append(column_name)
             if eligible:
                 eligible_map[table_name] = eligible
@@ -1267,6 +1269,7 @@ class MCVInjector:
             not_nulls = {c.get("name", "").lower() for c in meta.get("not_null_columns") or []}
 
             eligible = []
+            ndv_guard_active = self.min_ndv_for_injection > 0
             for column_name in columns:
                 lowered = column_name.lower()
                 if lowered in key_like or lowered in not_nulls:
@@ -1274,17 +1277,18 @@ class MCVInjector:
                 qualified = f"{table_name.lower()}.{lowered}"
                 if lowered in self.exclude_columns or qualified in self.exclude_qualified:
                     continue
-                ndv_value = self.ndv_values.get(qualified)
-                if ndv_value is None or ndv_value < self.min_ndv_for_injection:
-                    ndv_excluded.append(
-                        {
-                            "table": table_name,
-                            "column": column_name,
-                            "qualified": qualified,
-                            "ndv": ndv_value,
-                        }
-                    )
-                    continue
+                if ndv_guard_active:
+                    ndv_value = self.ndv_values.get(qualified)
+                    if ndv_value is None or ndv_value < self.min_ndv_for_injection:
+                        ndv_excluded.append(
+                            {
+                                "table": table_name,
+                                "column": column_name,
+                                "qualified": qualified,
+                                "ndv": ndv_value,
+                            }
+                        )
+                        continue
                 eligible.append(column_name)
             if eligible:
                 eligible_map[table_name] = eligible

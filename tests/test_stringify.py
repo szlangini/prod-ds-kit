@@ -78,15 +78,12 @@ class StringifyTests(unittest.TestCase):
                 "i_manufact_id": "10",
             },
             "store_sales": {
-                "ss_ticket_number": "12",
                 "ss_sold_time_sk": "13",
             },
             "catalog_sales": {
-                "cs_order_number": "14",
                 "cs_sold_time_sk": "15",
             },
             "web_returns": {
-                "wr_order_number": "16",
                 "wr_returned_time_sk": "17",
             },
         }
@@ -190,7 +187,7 @@ class StringifyTests(unittest.TestCase):
             skip.write_text("2|B|\n", encoding="utf-8")
 
             with mock.patch.object(stringify, "build_rules", return_value=rules):
-                files, rows = stringify.rewrite_tbl_directory(out_dir)
+                files, rows = stringify.rewrite_tbl_directory(out_dir, min_ndv_for_injection=0)
 
             self.assertEqual(1, files)
             self.assertEqual(1, rows)
@@ -213,7 +210,7 @@ class StringifyTests(unittest.TestCase):
             skip.write_text("2|B|\n", encoding="utf-8")
 
             with mock.patch.object(stringify, "build_rules", return_value=rules):
-                files, rows = stringify.rewrite_tbl_directory(out_dir)
+                files, rows = stringify.rewrite_tbl_directory(out_dir, min_ndv_for_injection=0)
 
             self.assertEqual(1, files)
             self.assertEqual(1, rows)
