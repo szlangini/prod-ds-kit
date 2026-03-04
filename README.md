@@ -33,19 +33,14 @@ source .venv/bin/activate
 
 ### Default Commands
 
-The `--default` flag uses recommended settings: **STR=10, NULL=medium, MCV=medium, SF=10, output=./output**.
+The `--default` flag uses recommended settings so you can get started with a single flag.
 
 ```bash
-# Generate data with all defaults (STR=10, NULL medium, MCV medium, SF=10)
+# Generate data (STR=10, NULL=medium, MCV=medium, SF=10, output=./output)
 python3 wrap_dsdgen.py --default
 
-# Generate extended queries for the default data
-python3 wrap_dsqgen.py --output-dir ./queries --stringification-level 10
-
-# Run the benchmark (DuckDB, no server required)
-python -m experiments run \
-    --config experiments/config.example.yaml \
-    --experiment workload_compare --system duckdb
+# Generate queries (STR=10, dialect=duckdb, output=./queries)
+python3 wrap_dsqgen.py --default
 ```
 
 You can override individual defaults:
@@ -57,8 +52,6 @@ python3 wrap_dsdgen.py --default -SCALE 1
 # Default settings but at SF=100
 python3 wrap_dsdgen.py --default -SCALE 100
 ```
-
-For a fully automated end-to-end walkthrough, see `examples/quickstart/run.sh`.
 
 ## For AI Agents
 
@@ -73,8 +66,7 @@ For a fully automated end-to-end walkthrough, see `examples/quickstart/run.sh`.
 # Generate data + queries with defaults:
 source .venv/bin/activate
 python3 wrap_dsdgen.py --default
-python3 wrap_dsqgen.py --output-dir ./queries --stringification-level 10
-python -m experiments run --help   # see all runner options
+python3 wrap_dsqgen.py --default
 ```
 
 ### Agent Prompt (Copy-Paste)
@@ -88,11 +80,9 @@ set up and run Prod-DS Kit end-to-end with DuckDB:
 > binaries exist in `tpcds-kit/tools/`. Check that `python3 -c "from workload
 > import stringification"` succeeds. Then generate data using
 > `python3 wrap_dsdgen.py --default -SCALE 1` (uses STR=10, NULL=medium,
-> MCV=medium). Generate queries with `python3 wrap_dsqgen.py --output-dir ./queries
-> --stringification-level 10`. Verify that `./output/` contains `.dat` files and
-> `./queries/` contains `.sql` files. Finally, run the DuckDB benchmark:
-> `python -m experiments run --config experiments/config.example.yaml
-> --experiment workload_compare --system duckdb`. Report any errors encountered.
+> MCV=medium). Generate queries with `python3 wrap_dsqgen.py --default`.
+> Verify that `./output/` contains `.dat` files and `./queries/` contains `.sql`
+> files. Report any errors encountered.
 
 ## Extension Parameters
 
@@ -111,7 +101,8 @@ set up and run Prod-DS Kit end-to-end with DuckDB:
 
 | Flag | Values | Default | Effect |
 |------|--------|---------|--------|
-| `--output-dir` | path | required | Output directory for generated SQL files |
+| `--default` | flag | off | Use recommended defaults: STR=10, dialect=duckdb, output=./queries |
+| `--output-dir` | path | required | Output directory for generated SQL files (optional with `--default`) |
 | `--stringification-level` | 1-15 | none | Activates extended templates and literal post-processing for the given STR level |
 | `--no-extensions` | flag | off | Use base TPC-DS templates only (skip `*_ext.tpl`) |
 | `--dialect` | `ansi`, `duckdb` | `ansi` | SQL dialect for dsqgen output |

@@ -2139,8 +2139,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument(
         "--output-dir",
-        required=True,
-        help="Directory for generated SQL output.",
+        default=None,
+        help="Directory for generated SQL output (required unless --default is used).",
     )
     ap.add_argument("--dialect", default="ansi", help="Dsqgen dialect (default: ansi).")
     ap.add_argument(
@@ -2315,11 +2315,30 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Cap the maximum UNION ALL fan-in inputs (default: no cap).",
     )
+    ap.add_argument(
+        "--default",
+        action="store_true",
+        help="Use recommended defaults: STR=10, dialect=duckdb, output=./queries.",
+    )
 
     ap.set_defaults(include_join=True)
     ap.set_defaults(include_union=True)
     ap.set_defaults(qualify=True)
     args = ap.parse_args(argv)
+
+    # --default: STR=10, dialect=duckdb, output=./queries
+    if args.default:
+        if args.stringification_level is None and args.stringification_preset is None:
+            args.stringification_level = 10
+        if args.dialect == "ansi":
+            args.dialect = "duckdb"
+        if args.output_dir is None:
+            args.output_dir = "./queries"
+        print("[default] Using recommended defaults: STR=10, dialect=duckdb, output=./queries")
+
+    if args.output_dir is None:
+        raise SystemExit("--output-dir is required (or use --default).")
+
     if args.stringification_level is not None and args.stringification_preset is not None:
         raise SystemExit("--stringification-level and --stringification-preset are mutually exclusive.")
     resolved_level, resolved_preset = stringification_cfg.resolve_level(

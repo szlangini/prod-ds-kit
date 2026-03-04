@@ -2,8 +2,15 @@
 # snowflake_benchmark.sh — End-to-end Prod-DS Kit benchmark on Snowflake.
 #
 # Generates data (TPC-DS SF100 + Prod-DS SF100), uploads to Snowflake,
-# creates schemas, loads tables, runs warmup + 10 timed repetitions,
-# collects timing from QUERY_HISTORY, and produces a summary report.
+# creates schemas, loads tables, runs 1 warmup + 10 timed repetitions,
+# collects timing from QUERY_HISTORY, and produces a summary report
+# with visualization plots (bar chart comparing TPC-DS vs Prod-DS).
+#
+# Protocol:
+#   - 1 warmup repetition (results discarded, primes caches)
+#   - Warehouse suspend + resume (clears compute-layer cache)
+#   - 10 timed repetitions (alternating TPC-DS / Prod-DS per rep)
+#   - Median of timed reps used for comparison
 #
 # Usage:
 #   bash scripts/snowflake_benchmark.sh
@@ -313,8 +320,8 @@ ORDER BY start_time;
 
 ok "Query history collected."
 
-# ---------- Step 10: Generate summary report ----------
-info "Generating summary report..."
+# ---------- Step 10: Generate summary report + visualization ----------
+info "Generating summary report and visualization..."
 
 python3 -c "
 import csv
@@ -329,6 +336,7 @@ if not raw_path.exists():
     print('No results found.')
     sys.exit(1)
 
+# ---- Parse raw times (skip warmup rows) ----
 data = defaultdict(lambda: defaultdict(list))
 with open(raw_path) as f:
     reader = csv.DictReader(f)
@@ -343,11 +351,23 @@ with open(raw_path) as f:
         if status == 'SUCCESS':
             data[suite_base][query].append(elapsed)
 
+# ---- Build per-query median tables ----
+suite_medians = {}
+for suite in sorted(data.keys()):
+    queries = data[suite]
+    medians = {}
+    for qname in sorted(queries.keys()):
+        times = sorted(queries[qname])
+        medians[qname] = times[len(times) // 2]
+    suite_medians[suite] = medians
+
+# ---- Text report ----
 report = []
 report.append('=' * 70)
 report.append('  Prod-DS Kit Snowflake Benchmark Report')
 report.append('  SF=${SF}, STR=${STR_LEVEL}, Warehouse=${WAREHOUSE_SIZE}')
-report.append('  Warmup: ${WARMUP_REPS}, Timed Reps: ${TIMED_REPS}')
+report.append('  Protocol: ${WARMUP_REPS} warmup rep (discarded) + ${TIMED_REPS} timed reps')
+report.append('  Metric: median of ${TIMED_REPS} timed repetitions')
 report.append('=' * 70)
 report.append('')
 
@@ -376,6 +396,66 @@ print(report_text)
 report_path = results_dir / 'benchmark_report.txt'
 report_path.write_text(report_text)
 print(f'\nReport saved to {report_path}')
+
+# ---- Visualization (matplotlib) ----
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import matplotlib.ticker as ticker
+
+    tpcds = suite_medians.get('tpcds', {})
+    prodds = suite_medians.get('prodds', {})
+    all_queries = sorted(set(tpcds.keys()) | set(prodds.keys()))
+
+    if not all_queries:
+        print('No query data for visualization.')
+        sys.exit(0)
+
+    tpcds_vals = [tpcds.get(q, 0) for q in all_queries]
+    prodds_vals = [prodds.get(q, 0) for q in all_queries]
+    labels = [q.replace('query_', 'Q') for q in all_queries]
+
+    # -- Per-query comparison bar chart --
+    fig, ax = plt.subplots(figsize=(max(14, len(all_queries) * 0.25), 6))
+    import numpy as np
+    x = np.arange(len(all_queries))
+    w = 0.38
+    ax.bar(x - w/2, tpcds_vals, w, label='TPC-DS (vanilla)', color='#4c72b0', alpha=0.85)
+    ax.bar(x + w/2, prodds_vals, w, label='Prod-DS (STR=${STR_LEVEL})', color='#dd8452', alpha=0.85)
+    ax.set_xlabel('Query')
+    ax.set_ylabel('Median latency (ms)')
+    ax.set_title('TPC-DS vs Prod-DS  |  SF=${SF}, ${TIMED_REPS} reps, Snowflake ${WAREHOUSE_SIZE}')
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=90, fontsize=6)
+    ax.legend()
+    ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda v, _: f'{v:,.0f}'))
+    fig.tight_layout()
+    chart_path = results_dir / 'query_comparison.png'
+    fig.savefig(chart_path, dpi=150)
+    plt.close(fig)
+    print(f'Chart saved to {chart_path}')
+
+    # -- Total runtime comparison bar chart --
+    fig2, ax2 = plt.subplots(figsize=(6, 5))
+    totals = [sum(tpcds_vals) / 1000, sum(prodds_vals) / 1000]
+    bars = ax2.bar(['TPC-DS (vanilla)', 'Prod-DS (STR=${STR_LEVEL})'], totals,
+                   color=['#4c72b0', '#dd8452'], alpha=0.85, width=0.5)
+    for bar, val in zip(bars, totals):
+        ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.3,
+                 f'{val:,.1f}s', ha='center', fontsize=11, fontweight='bold')
+    ax2.set_ylabel('Total runtime (seconds)')
+    ax2.set_title('Total Benchmark Runtime  |  SF=${SF}, Snowflake ${WAREHOUSE_SIZE}')
+    fig2.tight_layout()
+    totals_path = results_dir / 'total_comparison.png'
+    fig2.savefig(totals_path, dpi=150)
+    plt.close(fig2)
+    print(f'Totals chart saved to {totals_path}')
+
+except ImportError:
+    print('matplotlib not available — skipping visualization. Install with: pip install matplotlib')
+except Exception as e:
+    print(f'Visualization failed (non-fatal): {e}')
 "
 
 # ---------- Step 11: Cleanup ----------
@@ -387,5 +467,7 @@ ok "Benchmark complete!"
 echo ""
 echo "  Results:  ${RESULTS_DIR}/raw_times.csv"
 echo "  Report:   ${RESULTS_DIR}/benchmark_report.txt"
+echo "  Charts:   ${RESULTS_DIR}/query_comparison.png"
+echo "            ${RESULTS_DIR}/total_comparison.png"
 echo "  History:  ${RESULTS_DIR}/snowflake_query_history.tsv"
 echo ""
