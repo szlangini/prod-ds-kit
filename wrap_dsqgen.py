@@ -2587,10 +2587,12 @@ def main(argv: list[str] | None = None) -> int:
     split_queries = args.split if args.split is not None else split_default
     if split_queries:
         _split_queries(output_dir, keep_combined=args.keep_combined)
-        _sanitize_query_files(output_dir)
 
     if not args.join_only:
         _postprocess_limits(output_dir, template_dir, scale=args.scale)
+
+    if split_queries:
+        _sanitize_query_files(output_dir)
         # Dialect-independent SQL fixups (dsqgen template bugs)
         for path in output_dir.glob("*.sql"):
             sql = path.read_text(encoding="utf-8")
