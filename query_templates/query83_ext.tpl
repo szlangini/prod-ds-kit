@@ -89,16 +89,17 @@ with sr_items as
  group by i_item_id)
 [_LIMITA] select [_LIMITB] sr_items.item_id
        ,sr_item_qty
-       ,any_value((select i_category from item where i_item_id = sr_items.item_id)) as any_item_category
-       ,max((select i_brand from item where i_item_id = sr_items.item_id)) as max_item_brand
-       ,count(distinct (select i_product_name from item where i_item_id = sr_items.item_id)) as distinct_product_name_count
+       ,(select any_value(i_category) from item where i_item_id = sr_items.item_id) as any_item_category
+       ,(select max(i_brand) from item where i_item_id = sr_items.item_id) as max_item_brand
+       ,(select count(distinct i_product_name) from item where i_item_id = sr_items.item_id) as distinct_product_name_count
        ,max(cast((select max(d_date) from date_dim where d_week_seq in (select d_week_seq from date_dim where d_date in ('[RETURNED_DATE_ONE]','[RETURNED_DATE_TWO]','[RETURNED_DATE_THREE]'))) as timestamp)) as max_return_ts
  from sr_items
      ,cr_items
      ,wr_items
  where sr_items.item_id=cr_items.item_id
-   and sr_items.item_id=wr_items.item_id 
+   and sr_items.item_id=wr_items.item_id
    and sr_item_qty > 0
+ group by sr_items.item_id, sr_item_qty
  order by max_return_ts desc
          ,sr_item_qty desc
          ,sr_items.item_id

@@ -138,7 +138,7 @@ with  cross_items as
          and i_brand is not null
        group by i_brand_id,i_class_id,i_category_id, i_brand, i_category, i_product_name
  ) y
- group by rollup (channel, i_brand_id,i_class_id,i_category_id)
+ group by channel, i_brand_id,i_class_id,i_category_id
  order by channel,i_brand_id,i_class_id,i_category_id ;
  
  with  cross_items as
@@ -254,4 +254,8 @@ with  cross_items as
  where this_year.i_brand_id= last_year.i_brand_id
    and this_year.i_class_id = last_year.i_class_id
    and this_year.i_category_id = last_year.i_category_id
+ group by this_year.channel, this_year.i_brand_id, this_year.i_class_id, this_year.i_category_id
+        , this_year.sales, this_year.number_sales
+        , last_year.channel, last_year.i_brand_id, last_year.i_class_id, last_year.i_category_id
+        , last_year.sales, last_year.number_sales
  order by this_year.channel, this_year.i_brand_id, this_year.i_class_id, this_year.i_category_id ;

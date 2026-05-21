@@ -91,4 +91,4 @@ select distinct(i_product_name)
         (i_units = '[UNIT.15]' or i_units = '[UNIT.16]') and
         (i_size = '[SIZE.1]' or i_size = '[SIZE.2]')
         )))) > 0
- order by i_manufact_id desc ;
+ order by i_product_name desc ;

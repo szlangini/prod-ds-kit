@@ -40,6 +40,7 @@ define COLOR=ulist(dist(colors,1,1),2);
 with ssales as
 (select c_last_name
       ,c_first_name
+      ,c_birth_country
       ,s_store_name
       ,ca_state
       ,s_state
@@ -70,6 +71,7 @@ where ss_ticket_number = sr_ticket_number
   and i_color is not null
 group by c_last_name
         ,c_first_name
+        ,c_birth_country
         ,s_store_name
         ,ca_state
         ,s_state
@@ -97,6 +99,7 @@ order by paid desc
 with ssales as
 (select c_last_name
       ,c_first_name
+      ,c_birth_country
       ,s_store_name
       ,ca_state
       ,s_state
@@ -127,6 +130,7 @@ where ss_ticket_number = sr_ticket_number
   and i_color is not null
 group by c_last_name
         ,c_first_name
+        ,c_birth_country
         ,s_store_name
         ,ca_state
         ,s_state

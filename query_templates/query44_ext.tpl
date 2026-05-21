@@ -72,4 +72,5 @@ where asceding.rnk = descending.rnk
   and i2.i_category in ('Home','Electronics','Sports')
   and i1.i_brand is not null
   and i2.i_brand is not null
+group by asceding.rnk, i1.i_product_name, i2.i_product_name
 order by asceding.rnk ;

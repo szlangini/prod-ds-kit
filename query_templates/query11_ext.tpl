@@ -93,9 +93,9 @@ with year_total as (
                  ,any_value(t_s_secyear.customer_birth_country) as any_birth_country
                  ,any_value(t_s_secyear.customer_email_address) as any_email_address
                  ,count(distinct t_s_secyear.customer_login) as distinct_login_count
-                 ,max(t_s_secyear.customer_login) over () as max_login
-                 ,min(t_s_secyear.customer_birth_country) over () as min_birth_country
-                 ,any_value(t_s_secyear.customer_preferred_cust_flag) over () as any_pref_flag
+                 ,max(t_s_secyear.customer_login) as max_login
+                 ,min(t_s_secyear.customer_birth_country) as min_birth_country
+                 ,any_value(t_s_secyear.customer_preferred_cust_flag) as any_pref_flag
  from year_total t_s_firstyear
      ,year_total t_s_secyear
      ,year_total t_w_firstyear
@@ -118,6 +118,7 @@ with year_total as (
          and t_s_firstyear.customer_email_address is not null
          and case when t_w_firstyear.year_total > 0 then t_w_secyear.year_total / t_w_firstyear.year_total else 0.0 end
              > case when t_s_firstyear.year_total > 0 then t_s_secyear.year_total / t_s_firstyear.year_total else 0.0 end
-order by t_s_secyear.year_total desc
-        ,t_w_secyear.year_total desc
-        ,t_s_secyear.dyear desc ;
+group by t_s_secyear.customer_id
+        ,t_s_secyear.customer_first_name
+        ,t_s_secyear.customer_last_name
+        ,[SELECTONE] ;

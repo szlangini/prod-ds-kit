@@ -81,9 +81,9 @@ define _LIMIT=10;
             else (select avg([AGGCELSE])
                   from store_sales
                   where ss_quantity between 81 and 100) end bucket5
-from reason
-where r_reason_sk = 1
        ,any_value(r_reason_desc) as any_reason_desc
        ,count(distinct r_reason_id) as distinct_reason_id_count
+from reason
+where r_reason_sk = 1
 [_LIMITC];
  

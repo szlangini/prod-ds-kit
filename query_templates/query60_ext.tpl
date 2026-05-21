@@ -104,8 +104,8 @@ where i_category in ('[CATEGORY]'))
   i_item_id
 ,sum(total_sales) as total_sales
 ,count(*) as item_count
- ,any_value((select i_category from item where i_item_id = tmp1.i_item_id)) as any_item_category
- ,count(distinct (select i_product_name from item where i_item_id = tmp1.i_item_id)) as distinct_product_name_count
+ ,(select any_value(i_category) from item where i_item_id = tmp1.i_item_id) as any_item_category
+ ,(select count(distinct i_product_name) from item where i_item_id = tmp1.i_item_id) as distinct_product_name_count
  ,min((select min(d_date) from date_dim where d_year = [YEAR] and d_moy = [MONTH])) as min_sales_date
  ,max(cast((select max(d_date) from date_dim where d_year = [YEAR] and d_moy = [MONTH]) as timestamp)) as max_sales_ts
  from  (select * from ss 
