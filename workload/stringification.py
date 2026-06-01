@@ -766,11 +766,15 @@ def select_query_edits(
         allow_extended=allow_extended_levels,
         max_level=str_plus_max_level,
     )
-    intensity = intensity_from_level(resolved_level)
     candidates = query_edit_candidates(template_names, template_dir)
     total = len(candidates)
-    k_query = _round_half_up(intensity * total)
-    selected = candidates[:k_query]
+    # Query *_ext.tpl are SQL-correctness overrides (reserved-word aliases like
+    # `at`/`returns`, ambiguous columns, SQL-standard repairs) -- they must apply at
+    # EVERY STR level, not ramp with stringification intensity. So enable ALL of them.
+    # The STR level still controls schema recast + per-level literal stringification,
+    # which is orthogonal to whether a query template is SQL-corrected.
+    k_query = total
+    selected = candidates
     return QuerySelection(
         candidates=candidates,
         selected=tuple(selected),
