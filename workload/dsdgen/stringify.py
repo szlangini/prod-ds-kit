@@ -625,14 +625,20 @@ def _load_ndv_map(
         scale_factor=scale_factor,
     )
     if reference_db is None:
-        if min_ndv <= 0:
-            # NDV guard disabled -- skip cardinality check, inject into all eligible columns
-            return {}, 0, Path("/dev/null"), Path("/dev/null"), scale_factor
-        raise RuntimeError(
-            "NDV guard requires a baseline DuckDB file. "
-            "Set --ndv-reference-duckdb or PRODDS_NDV_DUCKDB, "
-            "or set --min-ndv-for-injection 0 to skip the guard."
-        )
+        if min_ndv > 0:
+            # No baseline DuckDB available: instead of failing, fall back to skipping
+            # the cardinality guard (equivalent to --min-ndv-for-injection 0) and warn.
+            # Pass --ndv-reference-duckdb / $PRODDS_NDV_DUCKDB / $PRODDS_DUCKDB_REF to
+            # enable the guard (e.g. for large SFs where it would exclude low-NDV columns).
+            print(
+                "[ndv-guard] WARNING: no baseline DuckDB found "
+                "(--ndv-reference-duckdb / $PRODDS_NDV_DUCKDB / $PRODDS_DUCKDB_REF) -- "
+                "skipping the NDV cardinality guard and injecting into all eligible "
+                "columns (equivalent to --min-ndv-for-injection 0).",
+                flush=True,
+            )
+        # NDV guard disabled / unavailable -- inject into all eligible columns.
+        return {}, 0, Path("/dev/null"), Path("/dev/null"), scale_factor
 
     raw_cache_dir = cfg.get("ndv_cache_dir") or os.getenv("PRODDS_NDV_CACHE_DIR")
     cache_dir = (
@@ -1655,7 +1661,7 @@ def rewrite_tbl_directory(
         backend: Rewrite backend (`auto`, `cpp`, `python`). Defaults to env
             `STRINGIFY_BACKEND` or `auto`.
         enable_stringify: Override for stringification toggle. Defaults to stringification level selection.
-        stringification_level: Stringification level (1-15; default: 10). STR>10 extends string length.
+        stringification_level: Stringification level 1-10 (type coverage; default 5 = production optimum, 10 = full). String length is the separate `strlen` parameter.
         stringification_preset: Named stringification preset (vanilla, low, medium, high, production).
         allow_extended_levels: Allow levels beyond STR10 (default: True).
         str_plus_enabled: Enable STR+ amplification semantics for STR>10 (auto-detected from level if None).

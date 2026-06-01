@@ -2272,7 +2272,7 @@ def main(argv: list[str] | None = None) -> int:
         "--stringify-level",
         dest="stringification_level",
         type=_positive_int,
-        help="Stringification level (1-15; default: 10). STR=1 is vanilla TPC-DS, STR=10 recasts all 131 columns, STR=11-15 extends string length.",
+        help="Stringification level 1-10 (type coverage; default 5 = production optimum). STR1 = vanilla TPC-DS, STR10 = full (all 131 columns). String length is the separate --strlen axis.",
     )
     ap.add_argument(
         "--stringification-preset",

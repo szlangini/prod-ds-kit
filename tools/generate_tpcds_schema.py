@@ -130,7 +130,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         "--level",
         dest="stringification_level",
         type=_positive_int,
-        help="Stringification level (1-15; default: 10).",
+        help="Stringification level 1-10 (default 5 = production optimum; STR10 = full coverage). String length is the separate --strlen axis.",
     )
     parser.add_argument(
         "--stringification-preset",

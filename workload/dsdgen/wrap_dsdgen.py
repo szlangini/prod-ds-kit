@@ -31,13 +31,21 @@ def _parse_positive_int(raw: str) -> int:
 
 
 def _parse_wrapper_args(argv: Sequence[str]) -> Tuple[argparse.Namespace, List[str]]:
-    parser = argparse.ArgumentParser(add_help=False)
+    parser = argparse.ArgumentParser(
+        add_help=True,
+        description=(
+            "PROD-DS data generator wrapper: runs dsdgen, then applies stringification "
+            "(STR level), optional NULL/MCV skew, and STR+ string-length amplification. "
+            "The wrapper flags are listed below; any other flags (e.g. -SCALE, -DIR) are "
+            "passed through to dsdgen."
+        ),
+    )
     parser.add_argument(
         "--stringification-level",
         "--stringify-level",
         dest="stringification_level",
         type=_parse_positive_int,
-        help="Stringification level (1-15; default: 10). STR=1 is vanilla TPC-DS, STR=10 recasts all 131 columns, STR=11-15 extends string length.",
+        help="Stringification level 1-10 (type coverage; default 5 = production optimum). STR1 = vanilla TPC-DS, STR10 = full (all 131 columns). String length is the separate --strlen axis.",
     )
     parser.add_argument(
         "--stringification-preset",
