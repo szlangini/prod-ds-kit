@@ -151,25 +151,25 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         "--str-plus-max-level",
         type=_positive_int,
         default=stringification.DEFAULT_STR_PLUS_MAX_LEVEL,
-        help="Maximum accepted STR level in STR+ mode (default: 20).",
+        help="Legacy STR+ level cap (default: 20); STR type coverage is capped at 10.",
     )
     parser.add_argument(
         "--str-plus-pad-step",
         type=_positive_int,
         default=2,
-        help="Extra suffix growth per level above STR10 (default: 2).",
+        help="Per-step filler growth for string-length amplification (default: 2).",
     )
     parser.add_argument(
         "--str-plus-separator",
         type=str,
         default="~",
-        help="Suffix separator for STR+ amplification (default: ~).",
+        help="Suffix separator for string-length amplification (default: ~).",
     )
     parser.add_argument(
         "--str-plus-marker",
         type=str,
         default="X",
-        help="Suffix marker for STR+ amplification (default: X).",
+        help="Suffix marker for string-length amplification (default: X).",
     )
     parser.add_argument("--out", type=Path, required=True, help="Output path for the derived DDL.")
     return parser.parse_args(argv)

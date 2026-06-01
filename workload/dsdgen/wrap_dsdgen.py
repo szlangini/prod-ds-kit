@@ -35,7 +35,7 @@ def _parse_wrapper_args(argv: Sequence[str]) -> Tuple[argparse.Namespace, List[s
         add_help=True,
         description=(
             "PROD-DS data generator wrapper: runs dsdgen, then applies stringification "
-            "(STR level), optional NULL/MCV skew, and STR+ string-length amplification. "
+            "(STR type-coverage level), optional NULL/MCV skew, and STRLEN string-length amplification. "
             "The wrapper flags are listed below; any other flags (e.g. -SCALE, -DIR) are "
             "passed through to dsdgen."
         ),
@@ -51,8 +51,8 @@ def _parse_wrapper_args(argv: Sequence[str]) -> Tuple[argparse.Namespace, List[s
         "--stringification-preset",
         dest="stringification_preset",
         type=str,
-        choices=["vanilla", "low", "medium", "high", "production"],
-        help="Stringification preset (vanilla, low, medium, high, production).",
+        choices=["vanilla", "low", "medium", "high", "production", "full"],
+        help="Stringification preset (vanilla=1, low=3, medium/production=5, high=8, full=10).",
     )
     parser.add_argument(
         "--stringify",
@@ -65,25 +65,25 @@ def _parse_wrapper_args(argv: Sequence[str]) -> Tuple[argparse.Namespace, List[s
         "--str-plus-max-level",
         type=_parse_positive_int,
         default=stringification_cfg.DEFAULT_STR_PLUS_MAX_LEVEL,
-        help="Maximum accepted level in STR+ mode (default: 20).",
+        help="Legacy STR+ level cap (default: 20); type coverage is capped at STR 10, length is set via --strlen.",
     )
     parser.add_argument(
         "--str-plus-pad-step",
         type=_parse_positive_int,
         default=2,
-        help="Extra suffix growth per level above STR10 (default: 2).",
+        help="Filler characters added per unit of --strlen (default: 2; total suffix = STRLEN x this).",
     )
     parser.add_argument(
         "--str-plus-separator",
         type=str,
         default="~",
-        help="Suffix separator for STR+ amplification (default: ~).",
+        help="Suffix separator for STRLEN amplification (default: ~).",
     )
     parser.add_argument(
         "--str-plus-marker",
         type=str,
         default="X",
-        help="Suffix marker repeated in STR+ amplification (default: X).",
+        help="Suffix marker repeated for STRLEN amplification (default: X).",
     )
     parser.add_argument(
         "--strlen",
@@ -156,7 +156,7 @@ def _parse_wrapper_args(argv: Sequence[str]) -> Tuple[argparse.Namespace, List[s
     parser.add_argument(
         "--default",
         action="store_true",
-        help="Use recommended defaults: STR=10, NULL medium, MCV medium, SF=10, output ./output.",
+        help="Use recommended defaults: STR=5, NULL medium, MCV medium, SF=10, output ./output.",
     )
 
     parsed, passthrough = parser.parse_known_args(argv)
@@ -327,10 +327,10 @@ def _run_rewrite(
 def main(argv: Sequence[str]) -> int:
     parsed, passthrough = _parse_wrapper_args(argv)
 
-    # --default: STR=10, NULL medium, MCV medium, SF=10, output ./output
+    # --default: STR=5 (production optimum), NULL medium, MCV medium, SF=10, output ./output
     if parsed.default:
         if parsed.stringification_level is None and parsed.stringification_preset is None and parsed.stringify is None:
-            parsed.stringification_level = 10
+            parsed.stringification_level = 5
         if parsed.null_profile is None:
             parsed.null_profile = "medium"
         if parsed.mcv_profile is None:
@@ -351,7 +351,7 @@ def main(argv: Sequence[str]) -> int:
         has_force = any(t.upper() in ("-FORCE", "--FORCE") for t in passthrough)
         if not has_force:
             passthrough = passthrough + ["-FORCE"]
-        print("[default] Using recommended defaults: STR=10, NULL=medium, MCV=medium, SF=10, DIR=./output")
+        print("[default] Using recommended defaults: STR=5, STRLEN=0, NULL=medium, MCV=medium, SF=10, DIR=./output")
 
     stringify_level = parsed.stringification_level
     stringify_preset = parsed.stringification_preset
@@ -377,6 +377,10 @@ def main(argv: Sequence[str]) -> int:
         default_dir=TOOLS_DIR,
     )
     passthrough = normalized_args
+    # Ensure the dsdgen output directory exists -- dsdgen otherwise aborts with a cryptic
+    # "Failed to open output file!" when -DIR points at a not-yet-created directory.
+    if dir_path is not None:
+        dir_path.mkdir(parents=True, exist_ok=True)
 
     binary = _resolve_dsdgen_binary()
     num_parallel = parsed.parallel

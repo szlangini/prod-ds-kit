@@ -2293,25 +2293,25 @@ def main(argv: list[str] | None = None) -> int:
         "--str-plus-max-level",
         type=_positive_int,
         default=stringification_cfg.DEFAULT_STR_PLUS_MAX_LEVEL,
-        help="Maximum accepted level in STR+ mode (default: 20).",
+        help="Legacy STR+ level cap (default: 20); type coverage is capped at STR 10, length is set via --strlen.",
     )
     ap.add_argument(
         "--str-plus-pad-step",
         type=_positive_int,
         default=2,
-        help="Extra suffix growth per level above STR10 (default: 2).",
+        help="Filler characters added per unit of --strlen (default: 2; total suffix = STRLEN x this).",
     )
     ap.add_argument(
         "--str-plus-separator",
         type=str,
         default="~",
-        help="Suffix separator for STR+ literals/data (default: ~).",
+        help="Suffix separator for STRLEN amplification of literals/data (default: ~).",
     )
     ap.add_argument(
         "--str-plus-marker",
         type=str,
         default="X",
-        help="Suffix marker for STR+ literals/data (default: X).",
+        help="Suffix marker for STRLEN amplification of literals/data (default: X).",
     )
     ap.add_argument(
         "--strlen",
@@ -2405,7 +2405,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--default",
         action="store_true",
-        help="Use recommended defaults: STR=10, dialect=duckdb, output=./queries.",
+        help="Use recommended defaults: STR=5, dialect=duckdb, output=./queries.",
     )
 
     ap.set_defaults(include_join=True)
@@ -2418,15 +2418,15 @@ def main(argv: list[str] | None = None) -> int:
         args.include_join = False
         args.include_union = False
 
-    # --default: STR=10, dialect=duckdb, output=./queries
+    # --default: STR=5 (production optimum), dialect=duckdb, output=./queries
     if args.default:
         if args.stringification_level is None and args.stringification_preset is None:
-            args.stringification_level = 10
+            args.stringification_level = 5
         if args.dialect == "ansi":
             args.dialect = "duckdb"
         if args.output_dir is None:
             args.output_dir = "./queries"
-        print("[default] Using recommended defaults: STR=10, dialect=duckdb, output=./queries")
+        print("[default] Using recommended defaults: STR=5, dialect=duckdb, output=./queries")
 
     if args.output_dir is None:
         raise SystemExit("--output-dir is required (or use --default).")
