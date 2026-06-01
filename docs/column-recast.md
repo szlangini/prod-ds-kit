@@ -68,18 +68,28 @@ string-processing coverage: joins, filters, aggregations, and ordering.
 
 ## Selection Order
 
-Candidates enter the recast set in DDL order as the stringification level
-increases:
+Candidates enter the recast set as **whole join domains** (not individual
+columns), one domain per level, ordered by decreasing *join mass* -- how
+frequently the domain's key participates in equi-joins across the workload. A
+domain is the complete set of PK/FK columns that share a key space, so both
+operands of every equi-join are recast together and joins never become
+mixed-type:
 
-1. **STR 2--4**: Dimension-table primary keys and item classification codes are
-   recast first.
-2. **STR 5--7**: Demographic and geographic keys are progressively added.
-3. **STR 8--10**: The three largest fact tables (`store_sales`, `catalog_sales`,
-   `web_sales`) are deferred to these levels so that the I/O impact of
-   stringification is concentrated at high levels.
+1. **STR 2**: the `date` domain (`d_date_sk` plus every `*_date_sk` foreign key,
+   including the fact-table date keys) -- the highest-mass domain and the largest
+   single step (+23 columns).
+2. **STR 3--5**: `item`, then `customer`, then `store` (STR 5 is the default,
+   production-realistic optimum). Fact-table foreign keys are recast together with
+   their domain, so the large fact tables are stringified early -- not deferred.
+3. **STR 6--9**: `addr`, `hdemo`, `cdemo`, then `time` + `income_band`.
+4. **STR 10**: all remaining domains (`reason`, `promo`, `ship_mode`,
+   `call_center`, `catalog_page`, `web_*`, `warehouse`, and low-mass singletons)
+   -- full coverage, 131 columns.
 
-The full per-column list is included in the artifact and can be inspected via the
-`explain-stringification` CLI command.
+See [stringification-levels.md](stringification-levels.md) for the per-level
+column counts and sample values. The full per-column candidate list is included
+in the artifact and can be inspected via the `explain-stringification` CLI
+command.
 
 ## Implementation Reference
 

@@ -125,10 +125,10 @@ Runner: `python -m experiments run --experiment workload_compare`
 
 Runner: `python -m experiments run --experiment join_scaling`
 
-### E5 -- Stringification Sweep (DuckDB, STR 1..15)
+### E5 -- Stringification Sweep (DuckDB, STR 1..10)
 
 - Engine: DuckDB only.
-- Workload: Prod-DS SF100, stringification levels STR 1 through STR 15.
+- Workload: Prod-DS SF100, stringification levels STR 1 through STR 10.
 - Preflight: full query-set feasibility check with non-empty enforcement per level.
 - Timing: selected stringification-sensitive queries; 1 warmup, timed repetitions,
   median reporting.

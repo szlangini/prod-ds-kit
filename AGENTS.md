@@ -7,7 +7,7 @@ Prod-DS Kit — data- and query-centric extension to TPC-DS.
 ./install.sh && source .venv/bin/activate
 
 ## Generate Data & Queries
-python3 wrap_dsdgen.py --default        # STR=10, NULL=medium, MCV=medium, SF=10
+python3 wrap_dsdgen.py --default        # STR=5, NULL=medium, MCV=medium, SF=10
 python3 wrap_dsqgen.py --default        # 107 queries (99 standard + 8 micro-suite)
 
 ## Reproduce Paper Results

@@ -66,7 +66,7 @@ and all three engines installed.
 | E1 | 6.5          | End-to-end TPC-DS vs Prod-DS             | DuckDB, CedarDB, MonetDB | Fig. 8, 9, 10 |
 | E2 | 6.6          | Join-scaling micro-suite (J=16..2048)    | All                  | Fig. 11        |
 | E3 | 6.7          | UNION ALL fan-in scaling (U=2..2048)     | All                  | Fig. 12        |
-| E4 | 6.8          | Stringification sweep (STR=1..15)        | DuckDB               | Fig. 13        |
+| E4 | 6.8          | Stringification sweep (STR=1..10)        | DuckDB               | Fig. 13        |
 | E5 | 6.9          | Sparsity and skew sensitivity            | DuckDB, CedarDB      | Table 3        |
 
 Individual experiments can be run selectively:

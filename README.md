@@ -15,7 +15,7 @@ formulas, and worked examples from the paper appendices:
 | Appendix | Document | Contents |
 |----------|----------|----------|
 | A | [docs/join-amplification.md](docs/join-amplification.md) | Join-graph growth model J(k,m), SQL patterns (LOD/segment CTE), LEFT JOIN rejoin, calibration tables |
-| B | [docs/stringification-levels.md](docs/stringification-levels.md) | Intensity formula i=(STR-1)/9, full STR=1..15 table, column counts, padding widths, STR+ mode |
+| B | [docs/stringification-levels.md](docs/stringification-levels.md) | Two orthogonal knobs — STR (type coverage 1–10, default 5) and STRLEN (string length, default 0); per-level domain map, column counts, padding widths, prefixes |
 | C | [docs/column-recast.md](docs/column-recast.md) | 131 recast candidates across 24 tables, semantic categories, selection ordering, usage statistics |
 | D | [docs/null-profiles.md](docs/null-profiles.md) | Profile tuple P=(f,B,E), 4-step BLAKE2b assignment, three sparsity tiers with bucket definitions |
 | E | [docs/mcv-profiles.md](docs/mcv-profiles.md) | Profile tuple M=(f,B20,Br,E), dominance ratios, three skew tiers, injection ordering |
@@ -36,10 +36,10 @@ source .venv/bin/activate
 The `--default` flag uses recommended settings so you can get started with a single flag.
 
 ```bash
-# Generate data (STR=10, NULL=medium, MCV=medium, SF=10, output=./output)
+# Generate data (STR=5, STRLEN=0, NULL=medium, MCV=medium, SF=10, output=./output)
 python3 wrap_dsdgen.py --default
 
-# Generate queries (STR=10, dialect=duckdb, output=./queries)
+# Generate queries (STR=5, dialect=duckdb, output=./queries)
 python3 wrap_dsqgen.py --default
 ```
 
@@ -67,7 +67,7 @@ set up and run Prod-DS Kit end-to-end with DuckDB:
 > environment with `source .venv/bin/activate`. Verify that `dsdgen` and `dsqgen`
 > binaries exist in `tpcds-kit/tools/`. Check that `python3 -c "from workload
 > import stringification"` succeeds. Then generate data using
-> `python3 wrap_dsdgen.py --default -SCALE 1` (uses STR=10, NULL=medium,
+> `python3 wrap_dsdgen.py --default -SCALE 1` (uses STR=5, NULL=medium,
 > MCV=medium). Generate queries with `python3 wrap_dsqgen.py --default`.
 > Verify that `./output/` contains `.dat` files and `./queries/` contains `.sql`
 > files. Report any errors encountered.
@@ -78,8 +78,9 @@ set up and run Prod-DS Kit end-to-end with DuckDB:
 
 | Flag | Values | Default | Effect |
 |------|--------|---------|--------|
-| `--stringification-level` | 1-15 | 10 | Columns recast to strings (1-10) and per-value padding width; STR>10 extends string length only (column set frozen at STR=10) |
-| `--stringification-preset` | `vanilla` (STR 1), `low` (STR 3), `medium` (STR 5), `high` (STR 7), `production` (STR 10) | none | Named shortcut for stringification level |
+| `--stringification-level` | 1-10 | 5 | Type coverage — which numeric `_sk` domains are recast to strings (atomic whole-domain, mass-ordered; STR=5 = production optimum, STR=10 = full) |
+| `--strlen` | 0, 1, 2, … | 0 | String length — appends `STRLEN×2` filler chars to each stringified value (orthogonal to STR; 0 = natural length) |
+| `--stringification-preset` | `vanilla` (STR 1), `low` (STR 3), `medium`/`production` (STR 5), `high` (STR 8), `full` (STR 10) | none | Named shortcut for stringification level |
 | `--null-profile` | `low`, `medium`, `high` | none (no NULLs) | Fleet-derived NULL sparsity tier injected into eligible columns |
 | `--mcv-profile` | `low`, `medium`, `high` | none (no MCV) | Fleet-derived MCV skew tier injected into eligible columns |
 | `-SCALE` | integer | 1 | TPC-DS scale factor (1, 10, 100, ...) |
@@ -89,9 +90,10 @@ set up and run Prod-DS Kit end-to-end with DuckDB:
 
 | Flag | Values | Default | Effect |
 |------|--------|---------|--------|
-| `--default` | flag | off | Use recommended defaults: STR=10, dialect=duckdb, output=./queries |
+| `--default` | flag | off | Use recommended defaults: STR=5, dialect=duckdb, output=./queries |
 | `--output-dir` | path | required | Output directory for generated SQL files (optional with `--default`) |
-| `--stringification-level` | 1-15 | none | Activates extended templates and literal post-processing for the given STR level |
+| `--stringification-level` | 1-10 | none | Activates extended templates and literal post-processing for the given STR level |
+| `--strlen` | 0, 1, 2, … | 0 | String-length amplification of stringified literals (orthogonal to STR) |
 | `--no-extensions` | flag | off | Use base TPC-DS templates only (skip `*_ext.tpl`) |
 | `--dialect` | `ansi`, `duckdb` | `ansi` | SQL dialect for dsqgen output |
 | `--join` / `--no-join` | flag | on | Include/exclude join-amplified queries |
@@ -113,7 +115,7 @@ open an issue so we can investigate.
 |-----------|-----|-------------------|------|-------------|
 | NULL sparsity | ~5% columns, light rates | ~30% columns, fleet-derived rates | ~60% columns, heavy rates | `config/null_profiles.yml` |
 | MCV skew | ~20% columns, mild dominance | ~70% columns, fleet-derived dominance | ~90% columns, strong dominance | `config/mcv_profiles.yml` |
-| Stringification | vanilla (STR 1): 0 columns recast | medium (STR 5): 65 columns | production (STR 10): 131 columns | `config/string_profiles.yml` |
+| Stringification | vanilla (STR 1): 0 columns recast | production (STR 5): 47 columns | full (STR 10): 131 columns | `config/string_profiles.yml` |
 
 ### Benchmark runner (`python -m experiments run`)
 
@@ -128,13 +130,14 @@ including threading, memory limits, timeouts, and repetition counts.
 
 ## What Prod-DS Adds to TPC-DS
 
-### Stringification (STR=1..15)
+### Stringification (STR 1–10 + STRLEN)
 
 Recasts up to 131 integer columns (surrogate keys, demographic keys, time
 keys, codes) to variable-length strings. Forces hash joins, disables integer
-fast-paths, and inflates working-set sizes. STR=1 is vanilla TPC-DS; STR=10
-covers all 131 columns. STR+ (11-15) extends per-value string length without
-adding new columns.
+fast-paths, and inflates working-set sizes. STR=1 is vanilla TPC-DS; STR=5
+(the default) is the production-realistic optimum; STR=10 covers all 131
+columns. A separate STRLEN knob (≥1) extends per-value string length
+independently, without changing which columns are recast.
 
 ### Join-Graph Amplification
 

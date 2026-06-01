@@ -20,7 +20,7 @@ python3 wrap_dsdgen.py --stringification-level 1 -DIR ./data/sf1_str1 -SCALE 1
 This produces standard TPC-DS `.dat` files with pipe-delimited fields and no
 stringification applied (integer keys remain integers).
 
-## Step 2: Generate SF1 data at STR=10 (full Prod-DS)
+## Step 2: Generate SF1 data at STR=10 (full coverage)
 
 ```bash
 python3 wrap_dsdgen.py --stringification-level 10 \
@@ -29,7 +29,11 @@ python3 wrap_dsdgen.py --stringification-level 10 \
 ```
 
 This applies all 131 column recasts, NULL sparsity injection, and MCV skew
-injection to produce production-realistic data.
+injection. `STR=10` is *full* type coverage; it is used here to make the
+string-overhead effects maximally visible. The **default**, production-realistic
+configuration is `STR=5` (47 columns -- the `date`, `item`, `customer`, and
+`store` domains), obtained with `--default` or `--stringification-level 5`. A
+separate `--strlen N` knob amplifies value length independently of `STR`.
 
 ## Step 3: Generate queries
 
@@ -63,7 +67,7 @@ duckdb ./data/sf1_str10.duckdb < <(python3 tools/generate_tpcds_schema.py --leve
 ## Step 5: Compare timing
 
 The `run.sh` script prints a side-by-side comparison of execution times for
-a subset of queries under STR=1 (vanilla) and STR=10 (Prod-DS) configurations.
+a subset of queries under STR=1 (vanilla) and STR=10 (full coverage) configurations.
 
 ## Expected observations
 
