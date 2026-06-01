@@ -2093,6 +2093,16 @@ def _resolve_query_template_name(
     explicit_template: str | None = None,
 ) -> str:
     if explicit_template:
+        # Prefer the _ext override even when the seed-override config names a base
+        # template: the _ext is the SQL-corrected version (e.g. q72's qualified
+        # d_week_seq, q77's renamed `returns` alias), and overriding the base is its
+        # whole purpose. Seed-override configs recorded base template names, which
+        # would otherwise re-introduce the base bugs for permutation-remapped slots.
+        if not explicit_template.endswith("_ext.tpl"):
+            stem = explicit_template[:-4] if explicit_template.endswith(".tpl") else explicit_template
+            ext_candidate = f"{stem}_ext.tpl"
+            if (template_dir / ext_candidate).exists() and ext_candidate in enabled_ext_templates:
+                return ext_candidate
         return explicit_template
     ext_name = f"query{qnum}_ext.tpl"
     ext_path = template_dir / ext_name
