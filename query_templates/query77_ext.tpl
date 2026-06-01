@@ -52,7 +52,7 @@ with ss as
  ,
  sr as
  (select s_store_sk,
-         sum(sr_return_amt) as returns,
+         sum(sr_return_amt) as total_returns,
          sum(sr_net_loss) as profit_loss
  from store_returns,
       date_dim,
@@ -80,7 +80,7 @@ with ss as
  ), 
  cr as
  (select cr_call_center_sk,
-         sum(cr_return_amount) as returns,
+         sum(cr_return_amount) as total_returns,
          sum(cr_net_loss) as profit_loss
  from catalog_returns,
       date_dim
@@ -105,7 +105,7 @@ with ss as
  group by wp_web_page_sk), 
  wr as
  (select wp_web_page_sk,
-        sum(wr_return_amt) as returns,
+        sum(wr_return_amt) as total_returns,
         sum(wr_net_loss) as profit_loss
  from web_returns,
       date_dim,
@@ -119,14 +119,14 @@ with ss as
  [_LIMITA] select [_LIMITB] channel
         , id
         , sum(sales) as sales
-        , sum(returns) as returns
+        , sum(total_returns) as total_returns
         , sum(profit) as profit
         , any_value(label) as any_channel_label
  from 
  (select 'store channel' as channel
         , ss.s_store_sk as id
         , sales
-        , coalesce(returns, 0) as returns
+        , coalesce(total_returns, 0) as total_returns
         , (profit - coalesce(profit_loss,0)) as profit
         , store_name as label
  from   ss left join sr
@@ -135,7 +135,7 @@ with ss as
  select 'catalog channel' as channel
         , cs_call_center_sk as id
         , sales
-        , returns
+        , total_returns
         , (profit - profit_loss) as profit
         , call_center_name as label
  from  cs
@@ -144,7 +144,7 @@ with ss as
  select 'web channel' as channel
         , ws.wp_web_page_sk as id
         , sales
-        , coalesce(returns, 0) returns
+        , coalesce(total_returns, 0) total_returns
         , (profit - coalesce(profit_loss,0)) as profit
         , page_url as label
  from   ws left join wr
@@ -152,7 +152,7 @@ with ss as
  ) x
  group by rollup (channel, id)
  order by sales desc
-         ,returns desc
+         ,total_returns desc
          ,profit desc
  [_LIMITC];
  

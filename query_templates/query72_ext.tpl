@@ -67,5 +67,5 @@ where d1.d_week_seq = d2.d_week_seq
   and i_class is not null
   and w_state in ('CA','WA','GA','TX')
 group by i_item_desc,w_warehouse_name,d1.d_week_seq
-order by total_cnt desc, promo desc, no_promo desc, d_week_seq desc
+order by total_cnt desc, promo desc, no_promo desc, d1.d_week_seq desc
 [_LIMITC];
