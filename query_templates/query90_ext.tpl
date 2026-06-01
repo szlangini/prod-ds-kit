@@ -55,7 +55,7 @@ from ( select count(*) amc
          and ws_web_page_sk = web_page.wp_web_page_sk
          and household_demographics.hd_buy_potential in ('1001-5000','501-1000','>10000')
          and web_page.wp_type is not null
-         and web_page.wp_char_count > 0) at,
+         and web_page.wp_char_count > 0) at_q,
       ( select count(*) pmc
        from web_sales, household_demographics , time_dim, web_page
        where ws_sold_time_sk = time_dim.t_time_sk
