@@ -27,11 +27,12 @@ BASE_MAX_LEVEL = 10
 DEFAULT_STR_PLUS_MAX_LEVEL = 20
 
 PRESET_LEVELS = {
-    "vanilla": 1,
+    "vanilla": 1,            # raw, no stringification
     "low": 3,
     "medium": 5,
-    "high": 7,
-    "production": BASE_MAX_LEVEL,
+    "production": 5,         # production-calibrated optimum (default); == legacy str2 (47 cols)
+    "high": 8,
+    "full": BASE_MAX_LEVEL,  # full type coverage (all candidates); == legacy str10
 }
 
 NUMERIC_PREFIXES = ("int", "integer", "bigint", "smallint", "decimal", "number", "numeric")
@@ -126,6 +127,33 @@ DOMAIN_PRIMARY_KEYS: Mapping[str, str] = {
     "catalog_page": "catalog_page.cp_catalog_page_sk",
     "web_page": "web_page.wp_web_page_sk",
     "web_site": "web_site.web_site_sk",
+}
+
+# ---------------------------------------------------------------------------
+# STR axis = TYPE COVERAGE, levels 1..10 (WorkloadLens-calibrated 2026-06).
+# Whole join-domains only (atomic): both sides of every equi-join change type
+# together, so no mixed-type "varchar = int" joins on strict engines (Umbra/
+# CedarDB/Postgres). Domains are mass-ordered (descending join-operand frequency)
+# so each step adds a roughly even amount of join-text; only `date` is an
+# unavoidably large atomic step (every *_date_sk FK joins the single d_date_sk).
+#   level 1  = raw (no recast)
+#   level 5  = production optimum / DEFAULT (cum. {date,item,customer,store} = 47
+#              cols == legacy str2, the operating point evaluated in the paper)
+#   level 10 = full type coverage (every candidate == legacy str10)
+# String LENGTH is a SEPARATE, orthogonal axis (the `strlen` parameter); it is
+# deliberately NOT folded into this level.
+STR_LEVEL_DOMAINS_ADDED: Mapping[int, tuple[str, ...]] = {
+    2: ("date",),
+    3: ("item",),
+    4: ("customer",),
+    5: ("store",),
+    6: ("addr",),
+    7: ("hdemo",),
+    8: ("cdemo",),
+    9: ("time", "income_band"),
+    # level 10 = full coverage (all remaining domains, incl. `reason` and the
+    # low-mass _id / trace singletons) -- handled as a catch-all in
+    # _level_schema_selection so it always equals the complete candidate set.
 }
 
 
@@ -686,6 +714,26 @@ def _progressive_schema_selection(
     )
 
 
+def _level_schema_selection(candidates: Sequence[str], level: int) -> tuple[str, ...]:
+    """Select recast columns for an STR level via the calibrated whole-domain map.
+
+    level <= 1            -> none (raw)
+    level >= BASE_MAX_LEVEL -> all candidates (full coverage)
+    otherwise             -> cumulative union of STR_LEVEL_DOMAINS_ADDED[2..level].
+
+    Whole domains are selected together, preserving canonical candidate order, so
+    both sides of every equi-join always share a type (no mixed-type joins).
+    """
+    if level <= 1:
+        return ()
+    if level >= BASE_MAX_LEVEL:
+        return tuple(candidates)
+    domains_on: set[str] = set()
+    for lv in range(2, level + 1):
+        domains_on.update(STR_LEVEL_DOMAINS_ADDED.get(lv, ()))
+    return tuple(c for c in candidates if _schema_domain_key(c) in domains_on)
+
+
 def query_edit_candidates(
     template_names: Iterable[str],
     template_dir: Path,
@@ -741,6 +789,7 @@ def build_stringification_config(
     template_dir: Path | None = None,
     base_pad_width: int = 8,
     min_pad_width: int | None = None,
+    strlen: int = 0,
     schema_selection_mode: str | None = None,
     allow_extended_levels: bool = True,
     str_plus_enabled: bool | None = None,
@@ -774,17 +823,12 @@ def build_stringification_config(
     if resolved_mode not in ("full", "partial"):
         raise ValueError("schema_selection_mode must be 'full' or 'partial'")
 
-    if resolved_level <= 1:
-        schema_selected = ()
-    elif resolved_mode == "full":
+    if resolved_mode == "full":
+        # Explicit override: recast every candidate regardless of level.
         schema_selected = candidates
     else:
-        target_k_schema = _round_half_up(intensity * len(candidates))
-        schema_selected = _progressive_schema_selection(
-            candidates,
-            target_k_schema,
-            level=resolved_level,
-        )
+        # STR level = type coverage via the calibrated whole-domain map.
+        schema_selected = _level_schema_selection(candidates, resolved_level)
     k_schema = len(schema_selected)
 
     payload = derive_payload_config(
@@ -826,9 +870,11 @@ def build_stringification_config(
         query_selected=query_selected,
         k_query=k_query,
         K_query_max=total_query,
-        str_plus_enabled=bool(str_plus_enabled and resolved_level > BASE_MAX_LEVEL),
+        # String LENGTH is the orthogonal `strlen` axis, decoupled from the STR
+        # (type-coverage) level: extra_pad grows with strlen, not with the level.
+        str_plus_enabled=bool(int(strlen) > 0),
         str_plus_max_level=int(str_plus_max_level),
-        amplification_extra_pad=max(0, resolved_level - BASE_MAX_LEVEL) * max(1, int(str_plus_pad_step)),
+        amplification_extra_pad=max(0, int(strlen)) * max(1, int(str_plus_pad_step)),
         amplification_pad_step=max(1, int(str_plus_pad_step)),
         amplification_separator=str(str_plus_separator),
         amplification_marker=str(str_plus_marker),
