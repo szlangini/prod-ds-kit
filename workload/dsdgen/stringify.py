@@ -1470,6 +1470,7 @@ def _run_cpp_rewrite(
     str_plus_pad_step: int,
     str_plus_separator: str,
     str_plus_marker: str,
+    strlen: int,
     enable_stringify: bool | None,
     enable_nulls: bool | None,
     null_seed: int | None,
@@ -1508,6 +1509,7 @@ def _run_cpp_rewrite(
             str_plus_pad_step=str_plus_pad_step,
             str_plus_separator=str_plus_separator,
             str_plus_marker=str_plus_marker,
+            strlen=strlen,
             enable_nulls=enable_nulls,
             null_seed=null_seed,
             null_marker=null_marker,
@@ -1626,6 +1628,7 @@ def rewrite_tbl_directory(
     str_plus_pad_step: int = 2,
     str_plus_separator: str = "~",
     str_plus_marker: str = "X",
+    strlen: int = 0,
     enable_nulls: bool | None = None,
     null_seed: int | None = None,
     null_marker: str | None = None,
@@ -1688,6 +1691,7 @@ def rewrite_tbl_directory(
         str_plus_pad_step=str_plus_pad_step,
         str_plus_separator=str_plus_separator,
         str_plus_marker=str_plus_marker,
+        strlen=strlen,
     )
     stringify_enabled = (config.k_schema > 0) if enable_stringify is None else enable_stringify
     rules = build_rules(config) if stringify_enabled else {}
@@ -1879,6 +1883,7 @@ def rewrite_tbl_directory(
             str_plus_pad_step=str_plus_pad_step,
             str_plus_separator=str_plus_separator,
             str_plus_marker=str_plus_marker,
+            strlen=strlen,
             enable_stringify=enable_stringify,
             enable_nulls=enable_nulls,
             null_seed=null_seed,
@@ -2009,6 +2014,7 @@ def build_rewrite_rules(
     str_plus_pad_step: int = 2,
     str_plus_separator: str = "~",
     str_plus_marker: str = "X",
+    strlen: int = 0,
     enable_nulls: bool | None = None,
     null_seed: int | None = None,
     null_marker: str | None = None,
@@ -2037,6 +2043,7 @@ def build_rewrite_rules(
         str_plus_pad_step=str_plus_pad_step,
         str_plus_separator=str_plus_separator,
         str_plus_marker=str_plus_marker,
+        strlen=strlen,
     )
     stringify_enabled = (config.k_schema > 0) if enable_stringify is None else bool(enable_stringify)
 
@@ -2181,6 +2188,7 @@ def export_rewrite_rules(
     str_plus_pad_step: int = 2,
     str_plus_separator: str = "~",
     str_plus_marker: str = "X",
+    strlen: int = 0,
     enable_nulls: bool | None = None,
     null_seed: int | None = None,
     null_marker: str | None = None,
@@ -2207,6 +2215,7 @@ def export_rewrite_rules(
         str_plus_pad_step=str_plus_pad_step,
         str_plus_separator=str_plus_separator,
         str_plus_marker=str_plus_marker,
+        strlen=strlen,
         enable_nulls=enable_nulls,
         null_seed=null_seed,
         null_marker=null_marker,

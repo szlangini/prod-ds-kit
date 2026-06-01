@@ -163,6 +163,9 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--str-plus-separator", default="~")
     p.add_argument("--str-plus-marker", default="X")
+    p.add_argument("--strlen", type=int, default=0,
+                   help="String LENGTH axis (0=natural; each step adds --str-plus-pad-step "
+                        "chars to stringified values). Orthogonal to the STR coverage level.")
     return p.parse_args()
 
 
@@ -201,6 +204,7 @@ def main() -> int:
         str_plus_pad_step=int(args.str_plus_pad_step),
         str_plus_separator=str(args.str_plus_separator),
         str_plus_marker=str(args.str_plus_marker),
+        strlen=int(args.strlen),
         enable_nulls=not bool(args.disable_null_skew),
         null_seed=args.null_seed,
         null_marker=args.null_marker,

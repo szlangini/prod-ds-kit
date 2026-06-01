@@ -2303,6 +2303,13 @@ def main(argv: list[str] | None = None) -> int:
         default="X",
         help="Suffix marker for STR+ literals/data (default: X).",
     )
+    ap.add_argument(
+        "--strlen",
+        type=int,
+        default=0,
+        help="String LENGTH axis (0=natural; each step adds --str-plus-pad-step chars to "
+             "stringified literals). Orthogonal to the STR type-coverage level.",
+    )
 
     ap.add_argument(
         "--split",
@@ -2428,6 +2435,7 @@ def main(argv: list[str] | None = None) -> int:
         level=resolved_level,
         preset=resolved_preset,
         base_pad_width=base_pad_width,
+        strlen=int(args.strlen),
         str_plus_max_level=int(args.str_plus_max_level),
         str_plus_pad_step=int(args.str_plus_pad_step),
         str_plus_separator=str(args.str_plus_separator),

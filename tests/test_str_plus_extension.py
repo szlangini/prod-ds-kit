@@ -25,16 +25,19 @@ class StrPlusExtensionTests(unittest.TestCase):
         self.assertFalse(cfg10.str_plus_enabled)
         self.assertEqual(0, cfg10.amplification_extra_pad)
 
-        cfg12 = stringification_cfg.build_stringification_config(
-            level=12,
+        # strlen is the orthogonal length axis: amplification is driven by strlen,
+        # NOT by the (type-coverage) level. extra_pad = strlen * pad_step.
+        cfg_amp = stringification_cfg.build_stringification_config(
+            level=10,
+            strlen=2,
             str_plus_max_level=20,
             str_plus_pad_step=3,
             str_plus_separator="~",
             str_plus_marker="X",
         )
-        self.assertTrue(cfg12.str_plus_enabled)
-        self.assertEqual(6, cfg12.amplification_extra_pad)
-        self.assertEqual(cfg12.K_schema_max, cfg12.k_schema)
+        self.assertTrue(cfg_amp.str_plus_enabled)
+        self.assertEqual(6, cfg_amp.amplification_extra_pad)
+        self.assertEqual(cfg_amp.K_schema_max, cfg_amp.k_schema)
 
     def test_stringify_value_amplification_monotone(self) -> None:
         s10 = stringify.stringify_value("42", "c", 4)
@@ -68,7 +71,8 @@ class StrPlusExtensionTests(unittest.TestCase):
             files, rows = stringify.rewrite_tbl_directory(
                 data_dir,
                 backend="python",
-                stringification_level=12,
+                stringification_level=10,
+                strlen=2,
                 str_plus_max_level=20,
                 str_plus_pad_step=2,
                 str_plus_separator="~",

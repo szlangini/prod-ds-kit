@@ -78,6 +78,13 @@ def _parse_wrapper_args(argv: Sequence[str]) -> Tuple[argparse.Namespace, List[s
         help="Suffix marker repeated in STR+ amplification (default: X).",
     )
     parser.add_argument(
+        "--strlen",
+        type=int,
+        default=0,
+        help="String LENGTH axis (0=natural; each step adds --str-plus-pad-step chars to "
+             "stringified values). Orthogonal to the STR type-coverage level.",
+    )
+    parser.add_argument(
         "--disable-null-skew",
         action="store_true",
         help="Skip NULL skew post-processing (enabled by default).",
@@ -254,6 +261,7 @@ def _run_rewrite(
     str_plus_pad_step: int,
     str_plus_separator: str,
     str_plus_marker: str,
+    strlen: int,
     null_enabled: bool,
     mcv_enabled: bool,
     null_marker: Optional[str] = None,
@@ -291,6 +299,7 @@ def _run_rewrite(
         str_plus_pad_step=str_plus_pad_step,
         str_plus_separator=str_plus_separator,
         str_plus_marker=str_plus_marker,
+        strlen=strlen,
         enable_nulls=null_enabled,
         null_seed=null_seed,
         null_marker=null_marker,
@@ -388,6 +397,7 @@ def main(argv: Sequence[str]) -> int:
             str_plus_pad_step=int(parsed.str_plus_pad_step),
             str_plus_separator=str(parsed.str_plus_separator),
             str_plus_marker=str(parsed.str_plus_marker),
+            strlen=int(parsed.strlen),
             null_enabled=null_skew_enabled,
             mcv_enabled=mcv_skew_enabled,
             null_marker=parsed.null_marker,
