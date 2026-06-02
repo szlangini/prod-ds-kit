@@ -72,7 +72,16 @@ class StringifyTests(unittest.TestCase):
 
     @pytest.mark.needs_tpcds_tools
     def test_extra_stringified_attributes_use_custom_prefixes(self) -> None:
-        rules = stringify.build_rules()
+        # i_manufact_id and the *_time_sk columns are recast only at full coverage
+        # (STR=10); the default is STR=5 (date/item/customer/store), so build rules
+        # at full coverage to exercise the custom-prefix mapping.
+        from workload import stringification as stringification_cfg
+
+        settings = stringify.stringify_rules()
+        config = stringification_cfg.build_stringification_config(
+            level=10, base_pad_width=int(settings["pad_width"])
+        )
+        rules = stringify.build_rules(config)
         targets = {
             "item": {
                 "i_manufact_id": "10",

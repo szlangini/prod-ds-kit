@@ -18,7 +18,7 @@ formulas, and worked examples from the paper appendices:
 | B | [docs/stringification-levels.md](docs/stringification-levels.md) | Two orthogonal knobs — STR (type coverage 1–10, default 5) and STRLEN (string length, default 0); per-level domain map, column counts, padding widths, prefixes |
 | C | [docs/column-recast.md](docs/column-recast.md) | 131 recast candidates across 24 tables, semantic categories, selection ordering, usage statistics |
 | D | [docs/null-profiles.md](docs/null-profiles.md) | Profile tuple P=(f,B,E), 4-step BLAKE2b assignment, three sparsity tiers with bucket definitions |
-| E | [docs/mcv-profiles.md](docs/mcv-profiles.md) | Profile tuple M=(f,B20,Br,E), dominance ratios, three skew tiers, injection ordering |
+| E | [docs/mcv-profiles.md](docs/mcv-profiles.md) | Profile tuple M=(f,B_T,E), max-value target buckets, null-compensated + monotonic injection reusing the natural dominant value, fleet calibration |
 | -- | [docs/experimental-protocol.md](docs/experimental-protocol.md) | Frozen evaluation protocol (E1-E6), engine versions, host spec, timeout policy, error taxonomy |
 | -- | [docs/dialect-adaptations.md](docs/dialect-adaptations.md) | Per-engine SQL rewrites for DuckDB, CedarDB, MonetDB; adding a new dialect |
 
@@ -114,7 +114,7 @@ open an issue so we can investigate.
 | Dimension | Low | Medium (default) | High | Config file |
 |-----------|-----|-------------------|------|-------------|
 | NULL sparsity | ~5% columns, light rates | ~30% columns, fleet-derived rates | ~60% columns, heavy rates | `config/null_profiles.yml` |
-| MCV skew | ~20% columns, mild dominance | ~70% columns, fleet-derived dominance | ~90% columns, strong dominance | `config/mcv_profiles.yml` |
+| MCV skew | milder max-value targets | fleet-shaped targets on query-safe columns (≥0.50 ~ 23% of cols) | strong targets, extreme tail | `config/mcv_profiles.yml` |
 | Stringification | vanilla (STR 1): 0 columns recast | production (STR 5): 47 columns | full (STR 10): 131 columns | `config/string_profiles.yml` |
 
 ### Benchmark runner (`python -m experiments run`)
@@ -162,10 +162,19 @@ deterministic via BLAKE2b hashing.
 
 ### MCV Skew Injection
 
-Replaces values in eligible columns with synthetic most-common values to
-create realistic frequency skew. Three tiers (low, medium, high) control
-the fraction of affected columns and dominance ratios. Execution order:
-NULL injection, then stringification, then MCV injection.
+Amplifies each eligible column's **natural dominant value** up to a target
+max-value share drawn from the profile, reproducing the production
+"Maximum MCV frequency" curve. The injection is **null-compensated** (it targets
+the share over *total* rows, undoing null dilution) and **monotonic** (it only
+raises a column's max-value share, never lowers it). Crucially it is
+**query-safe**: it only ever skews columns that no query filters/joins/groups on
+(`config/query_referenced_columns.txt`), so value concentration can never empty a
+query. This is why the realized curve lifts the mid-tail above the TPC-DS base and
+fixes the high-end regression while staying deliberately below the production fleet
+(paper §5.2.6) — the entire 107-query workload returns non-empty results. Three
+tiers (low, medium, high) set the target distribution. Execution order: NULL
+injection, then stringification, then MCV injection. See
+[docs/mcv-profiles.md](docs/mcv-profiles.md).
 
 ### Extended Query Templates
 

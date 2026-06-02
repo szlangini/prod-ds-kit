@@ -33,6 +33,25 @@ from workload.dsdgen.config import mcv_skew_rules, null_skew_rules, stringify_ru
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = REPO_ROOT / "tpcds-kit" / "tools" / "tpcds.sql"
+QUERY_REFERENCED_COLUMNS_PATH = REPO_ROOT / "config" / "query_referenced_columns.txt"
+
+
+@lru_cache(maxsize=1)
+def _query_referenced_columns() -> frozenset:
+    """Column names referenced anywhere in the query workload (filters, joins,
+    group-by, aggregations, output). MCV injection always excludes these so value
+    concentration can never collapse a query's selectivity or aggregation bands.
+    """
+    try:
+        text = QUERY_REFERENCED_COLUMNS_PATH.read_text(encoding="utf-8")
+    except OSError:
+        return frozenset()
+    names = {
+        line.strip().lower()
+        for line in text.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    return frozenset(names)
 
 CREATE_TABLE_RE = re.compile(r"create\s+table\s+([a-zA-Z0-9_]+)", re.IGNORECASE)
 COLUMN_DEF_RE = re.compile(
@@ -686,6 +705,216 @@ def _load_ndv_map(
     return ndv_values, min_ndv, reference_db, cache_path, scale_factor
 
 
+# Maximum distinct values tracked per column while scanning for the natural
+# dominant value. A "stop inserting once full" cap keeps memory bounded; any
+# genuine heavy hitter is inserted on its (early) first occurrence and then only
+# incremented, so its count stays exact regardless of the cap.
+NATURAL_STATS_COUNTER_CAP = 4096
+
+
+@dataclass(frozen=True)
+class NaturalColumnStat:
+    """Natural (pre-injection) distribution summary for one base-data column."""
+
+    value: str        # most-common non-null value in the base data
+    share_nn: float   # dominant_count / non_null_count, in [0, 1]
+    null_rate: float  # empty/NULL fraction over all rows, in [0, 1]
+
+
+def _natural_stats_cache_path(
+    *,
+    cache_dir: Path,
+    source_data_dir: Path,
+    schema: SchemaInfo,
+    eligible_map: Mapping[str, List[str]],
+    scale_factor: int | None,
+) -> Path:
+    cols_token = "|".join(
+        f"{table.lower()}.{column.lower()}"
+        for table in sorted(eligible_map)
+        for column in sorted(eligible_map[table])
+    )
+    # Fingerprint the data dir by file sizes so a rewritten dir invalidates the cache.
+    file_tokens: List[str] = []
+    for extension in DATA_EXTENSIONS:
+        for data_file in sorted(source_data_dir.glob(f"*{extension}")):
+            try:
+                stat = data_file.stat()
+            except OSError:
+                continue
+            # Include mtime AND a content-prefix hash (not just size) so a freshly
+            # written file -- even at a reused temp path with identical size and a
+            # coarse-granularity mtime (e.g. on some filesystems / rapid test reruns) --
+            # never reuses a stale entry.
+            try:
+                with data_file.open("rb") as handle:
+                    head = handle.read(4096)
+                head_digest = hashlib.blake2b(head, digest_size=6).hexdigest()
+            except OSError:
+                head_digest = "0"
+            file_tokens.append(
+                f"{data_file.name}:{stat.st_size}:{stat.st_mtime_ns}:{head_digest}"
+            )
+    token = "|".join(
+        [
+            str(source_data_dir.resolve()),
+            str(int(scale_factor or 0)),
+            _schema_signature(schema),
+            cols_token,
+            ";".join(file_tokens),
+        ]
+    )
+    digest = hashlib.blake2b(token.encode("utf-8"), digest_size=12).hexdigest()
+    return cache_dir / f"natural_mcv_{digest}.json"
+
+
+def _scan_natural_mcv_stats(
+    source_data_dir: Path,
+    schema: SchemaInfo,
+    eligible_map: Mapping[str, List[str]],
+) -> Dict[str, NaturalColumnStat]:
+    """Single streaming pass over the base data → per-column dominant value/share.
+
+    Reads only the tables/columns that are MCV-eligible. Uses a memory-bounded
+    heavy-hitter counter per column (see NATURAL_STATS_COUNTER_CAP).
+    """
+    # table -> [(column_name, row_index)] for eligible columns
+    table_targets: Dict[str, List[Tuple[str, int]]] = {}
+    for table_name, cols in eligible_map.items():
+        columns = schema.get(table_name, {}).get("columns") or []
+        index_of = {c.lower(): i for i, c in enumerate(columns)}
+        targets = [(c, index_of[c.lower()]) for c in cols if c.lower() in index_of]
+        if targets:
+            table_targets[table_name] = targets
+
+    files_by_table: Dict[str, List[Path]] = {}
+    for extension in DATA_EXTENSIONS:
+        for data_file in sorted(source_data_dir.glob(f"*{extension}")):
+            table_name = _table_name_from_filename(data_file.name)
+            if table_name and table_name in table_targets:
+                files_by_table.setdefault(table_name, []).append(data_file)
+
+    stats: Dict[str, NaturalColumnStat] = {}
+    for table_name, targets in table_targets.items():
+        files = files_by_table.get(table_name)
+        if not files:
+            continue
+        counters: Dict[int, Dict[str, int]] = {idx: {} for _, idx in targets}
+        non_null: Dict[int, int] = {idx: 0 for _, idx in targets}
+        max_idx = max(idx for _, idx in targets)
+        total_rows = 0
+        for data_file in files:
+            with data_file.open("r", encoding="utf-8", errors="surrogateescape") as handle:
+                for raw_line in handle:
+                    stripped = raw_line.rstrip("\n")
+                    if not stripped:
+                        continue
+                    row = stripped.split("|")
+                    if len(row) <= max_idx:
+                        continue
+                    total_rows += 1
+                    for _, idx in targets:
+                        value = row[idx]
+                        if value == "" or value == "\\N":
+                            continue
+                        non_null[idx] += 1
+                        counter = counters[idx]
+                        seen = counter.get(value)
+                        if seen is not None:
+                            counter[value] = seen + 1
+                        elif len(counter) < NATURAL_STATS_COUNTER_CAP:
+                            counter[value] = 1
+                        # counter full -> drop new rare values; heavy hitters already tracked
+        if total_rows <= 0:
+            continue
+        for column_name, idx in targets:
+            counter = counters[idx]
+            nn = non_null[idx]
+            if not counter or nn <= 0:
+                continue
+            best_value = max(counter, key=counter.get)
+            best_count = counter[best_value]
+            stats[f"{table_name.lower()}.{column_name.lower()}"] = NaturalColumnStat(
+                value=best_value,
+                share_nn=max(0.0, min(1.0, best_count / nn)),
+                null_rate=max(0.0, min(1.0, (total_rows - nn) / total_rows)),
+            )
+    return stats
+
+
+def _load_natural_mcv_stats(
+    schema: SchemaInfo,
+    eligible_map: Mapping[str, List[str]],
+    *,
+    source_data_dir: Path | None,
+    cache_dir: Path | None,
+    scale_factor: int | None,
+) -> Dict[str, NaturalColumnStat]:
+    if not source_data_dir or not eligible_map:
+        return {}
+    src = Path(source_data_dir)
+    if not src.is_dir():
+        return {}
+    resolved_cache_dir = (cache_dir or DEFAULT_NDV_CACHE_DIR).resolve()
+    cache_path: Path | None = None
+    try:
+        resolved_cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_path = _natural_stats_cache_path(
+            cache_dir=resolved_cache_dir,
+            source_data_dir=src,
+            schema=schema,
+            eligible_map=eligible_map,
+            scale_factor=scale_factor,
+        )
+    except OSError:
+        cache_path = None
+
+    if cache_path is not None and cache_path.exists():
+        try:
+            payload = json.loads(cache_path.read_text(encoding="utf-8"))
+            raw = payload.get("stats", {}) if isinstance(payload, dict) else {}
+            cached = {
+                str(key).lower(): NaturalColumnStat(
+                    value=str(entry.get("value", "")),
+                    share_nn=float(entry.get("share_nn", 0.0)),
+                    null_rate=float(entry.get("null_rate", 0.0)),
+                )
+                for key, entry in raw.items()
+                if isinstance(entry, Mapping)
+            }
+            if cached:
+                return cached
+        except (OSError, json.JSONDecodeError, ValueError, TypeError):
+            pass
+
+    stats = _scan_natural_mcv_stats(src, schema, eligible_map)
+    if cache_path is not None:
+        try:
+            cache_path.write_text(
+                json.dumps(
+                    {
+                        "source_data_dir": str(src.resolve()),
+                        "scale_factor": scale_factor,
+                        "generated_at_unix": time.time(),
+                        "stats": {
+                            key: {
+                                "value": stat.value,
+                                "share_nn": stat.share_nn,
+                                "null_rate": stat.null_rate,
+                            }
+                            for key, stat in stats.items()
+                        },
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
+    return stats
+
+
 def _prefix_for_column(
     table_name: str,
     column_name: str,
@@ -857,16 +1086,18 @@ class NullInjector:
         self.target_column_fraction: float = float(cfg.get("column_selection_fraction", 0.0))
         self.target_column_fraction = max(0.0, min(1.0, self.target_column_fraction))
         self.include_hot_path_columns: bool = bool(cfg.get("include_hot_path_columns", True))
-        if self.include_hot_path_columns:
-            self.exclude_tables = set()
-            self.exclude_columns = set()
-            self.exclude_qualified = set()
-        else:
-            self.exclude_tables: Set[str] = {str(t).lower() for t in cfg.get("exclude_tables", []) if t}
-            self.exclude_columns: Set[str] = {str(c).lower() for c in cfg.get("exclude_columns", []) if c}
-            self.exclude_qualified: Set[str] = {
-                str(c).lower() for c in cfg.get("exclude_qualified_columns", []) if c
-            }
+        # ALWAYS honor the exclusion list, regardless of the hot-path flag. The list
+        # names query-critical columns -- dimension calendars (date_dim/time_dim) and
+        # filter categoricals/measures (item.i_color, ss_ext_sales_price, ...) -- that
+        # must stay dense: nulling them heavily empties date- and value-filter queries
+        # (e.g. ~85% of date_dim.d_date was being nulled, breaking every query that
+        # filters a specific date). The hot-path flag is retained for API symmetry but
+        # no longer drops these protections.
+        self.exclude_tables: Set[str] = {str(t).lower() for t in cfg.get("exclude_tables", []) if t}
+        self.exclude_columns: Set[str] = {str(c).lower() for c in cfg.get("exclude_columns", []) if c}
+        self.exclude_qualified: Set[str] = {
+            str(c).lower() for c in cfg.get("exclude_qualified_columns", []) if c
+        }
         self.explicit_probabilities: Dict[str, float] = self._normalize_explicit_probabilities(
             cfg.get("column_probabilities") or {}
         )
@@ -915,6 +1146,14 @@ class NullInjector:
 
     def eligible_count(self, table_name: str) -> int:
         return len(self.eligible_columns.get(table_name, []))
+
+    def null_probabilities(self) -> Dict[str, float]:
+        """Map of qualified column -> injected NULL probability (for MCV compensation)."""
+        out: Dict[str, float] = {}
+        for table_name, table_rules in (self.rules or {}).items():
+            for rule in table_rules:
+                out[f"{table_name.lower()}.{rule.name.lower()}"] = float(rule.probability)
+        return out
 
     def apply_to_row(self, table_name: str, row: List[str], row_index: int, partition: str | None = None) -> None:
         if not self.enabled:
@@ -1107,28 +1346,50 @@ class MCVInjector:
         null_marker: str = "\\N",
         *,
         source_data_dir: Path | None = None,
+        null_probabilities: Mapping[str, float] | None = None,
+        natural_stats: Mapping[str, "NaturalColumnStat"] | None = None,
     ) -> None:
         self.null_marker = "" if null_marker is None else str(null_marker)
+        # Per-column injected NULL fraction (qualified -> p) used to compensate the
+        # MCV target so max_count/total_rows lands on target despite null dilution.
+        self.null_probabilities: Dict[str, float] = {
+            str(k).lower(): float(v) for k, v in (null_probabilities or {}).items()
+        }
+        self._natural_stats_override = natural_stats
+        self.natural_stats: Dict[str, "NaturalColumnStat"] = {}
         self.enabled: bool = bool(cfg.get("enabled", True))
         self.seed: int = int(cfg.get("seed", 0))
         self.selection_scope: str = str(cfg.get("selection_fraction_scope", "overall")).lower()
         self.target_column_fraction: float = float(cfg.get("column_selection_fraction", 0.0))
         self.target_column_fraction = max(0.0, min(1.0, self.target_column_fraction))
         self.include_hot_path_columns: bool = bool(cfg.get("include_hot_path_columns", True))
-        if self.include_hot_path_columns:
-            self.exclude_tables = set()
-            self.exclude_columns = set()
-            self.exclude_qualified = set()
-        else:
-            self.exclude_tables: Set[str] = {str(t).lower() for t in cfg.get("exclude_tables", []) if t}
-            self.exclude_columns: Set[str] = {str(c).lower() for c in cfg.get("exclude_columns", []) if c}
-            self.exclude_qualified: Set[str] = {
-                str(c).lower() for c in cfg.get("exclude_qualified_columns", []) if c
-            }
+        # MCV ALWAYS honors the exclusion list, regardless of the hot-path flag.
+        # Concentrating a query-critical column -- a low-cardinality categorical used
+        # in WHERE filters (e.g. item.i_category) or a measure used in aggregation
+        # bands (e.g. store_sales.ss_ext_sales_price) -- collapses predicate
+        # selectivity and induces empty-result queries (paper §5.2.6). Unlike NULL
+        # (which only dilutes), MCV dominance can wipe out the values a query selects,
+        # so the protection cannot be dropped the way the NULL pool drops it.
+        self.exclude_tables: Set[str] = {str(t).lower() for t in cfg.get("exclude_tables", []) if t}
+        self.exclude_columns: Set[str] = {str(c).lower() for c in cfg.get("exclude_columns", []) if c}
+        self.exclude_qualified: Set[str] = {
+            str(c).lower() for c in cfg.get("exclude_qualified_columns", []) if c
+        }
+        # Never concentrate a column the query workload references (filters, joins,
+        # group-by, aggregation bands): doing so collapses selectivity and empties
+        # queries. MCV therefore only ever skews query-untouched "payload" columns.
+        self.exclude_columns |= _query_referenced_columns()
         self.explicit_top5_rules: Dict[str, Dict[str, Any]] = self._normalize_explicit_top5_rules(
             cfg.get("column_top5_rules") or {}
         )
-        self._top20_buckets = self._normalize_buckets(cfg.get("top20_buckets") or [])
+        # Bucket distribution of the TARGET top-1 (max-value) share T -- i.e. the
+        # fraction of total rows the single most-common value should occupy. This is
+        # exactly the quantity the Redshift "Maximum MCV frequency" curve measures.
+        # `max_value_buckets` is the preferred key; `top20_buckets` is accepted for
+        # back-compat. `r_buckets` is no longer required (kept parsed for old configs).
+        self._top20_buckets = self._normalize_buckets(
+            cfg.get("max_value_buckets") or cfg.get("top20_buckets") or []
+        )
         self._r_buckets = self._normalize_buckets(cfg.get("r_buckets") or [])
         self.ndv_values: Dict[str, int] = {}
         self.min_ndv_for_injection: int = MIN_NDV_FOR_INJECTION
@@ -1152,13 +1413,31 @@ class MCVInjector:
         self.total_columns: int = 0
         self.eligible_fraction: float = 0.0
         self.selection_fraction: float = 0.0
-        if self.enabled and self._top20_buckets and self._r_buckets:
+        if self.enabled and self._top20_buckets:
             eligible_map, eligible_count, total_columns = self._collect_eligible(schema)
             self.total_columns = total_columns
             self.eligible_columns = eligible_map
             self.eligible_fraction = float(eligible_count) / float(total_columns) if total_columns else 0.0
             self.selection_fraction = self._calibrate_selection_fraction(self.eligible_fraction)
             if self.selection_fraction > 0.0 and eligible_count > 0:
+                if self._natural_stats_override is not None:
+                    self.natural_stats = {
+                        str(k).lower(): v for k, v in self._natural_stats_override.items()
+                    }
+                else:
+                    raw_cache_dir = cfg.get("ndv_cache_dir") or os.getenv("PRODDS_NDV_CACHE_DIR")
+                    nat_cache_dir = (
+                        Path(str(raw_cache_dir)).expanduser()
+                        if raw_cache_dir
+                        else DEFAULT_NDV_CACHE_DIR
+                    )
+                    self.natural_stats = _load_natural_mcv_stats(
+                        schema,
+                        eligible_map,
+                        source_data_dir=source_data_dir,
+                        cache_dir=nat_cache_dir,
+                        scale_factor=self.scale_factor,
+                    )
                 self.rules = self._build_rules(schema, eligible_map)
         if self.enabled and self.explicit_top5_rules:
             self._apply_explicit_top5_rules(schema)
@@ -1331,19 +1610,31 @@ class MCVInjector:
                 if _stable_unit_hash(self.seed, table_name, column_name, "select-mcv") >= self.selection_fraction:
                     continue
 
-                f20 = self._derive_value(table_name, column_name, "f20", self._top20_buckets)
-                if f20 <= 0.0:
+                target = self._derive_value(table_name, column_name, "target", self._top20_buckets)
+                if target <= 0.0:
                     continue
-                r = self._derive_value(table_name, column_name, "r", self._r_buckets)
-                f1 = max(0.0, min(f20, f20 * r))
-                values = _generate_mcv_values(table_name, column_name, column_types.get(column_name), self.seed)
+                qualified = f"{table_name.lower()}.{column_name.lower()}"
+                null_frac = max(0.0, min(1.0, float(self.null_probabilities.get(qualified, 0.0))))
+                stat = self.natural_stats.get(qualified)
+                f1, value = self._resolve_target(
+                    table_name,
+                    column_name,
+                    column_types.get(column_name),
+                    target=target,
+                    null_frac=null_frac,
+                    stat=stat,
+                )
+                # f1 <= 0 means the column already sits at/above the target once nulls
+                # are accounted for -> leave it untouched (monotonic: never lower it).
+                if f1 <= 0.0 or not value:
+                    continue
                 table_rules.append(
                     MCVColumnRule(
                         index=idx,
                         name=column_name,
-                        f20=f20,
+                        f20=f1,
                         f1=f1,
-                        values=values,
+                        values=[value],
                     )
                 )
 
@@ -1351,6 +1642,47 @@ class MCVInjector:
                 rules[table_name] = table_rules
 
         return rules
+
+    def _resolve_target(
+        self,
+        table: str,
+        column: str,
+        data_type: str | None,
+        *,
+        target: float,
+        null_frac: float,
+        stat: "NaturalColumnStat | None",
+    ) -> Tuple[float, str]:
+        """Compute (f1, value) so the realized top-1 share over ALL rows ~= target.
+
+        The per-cell contract is unchanged: a fraction f1 of non-null cells is set to
+        `value`. With g = final non-null fraction of total rows and s = the natural
+        dominant share among non-null cells, the realized max-value share over total
+        rows is g*(f1 + (1-f1)*s). Setting that equal to `target` and solving for f1
+        gives the formula below. Reusing the natural dominant value makes injection
+        strictly monotonic (it can only raise the share) and keeps real domain values.
+        """
+        if stat is not None:
+            share = max(0.0, min(1.0, stat.share_nn))
+            non_null_fraction = (1.0 - stat.null_rate) * (1.0 - null_frac)
+            value = stat.value
+        else:
+            # No natural stats available: fall back to a synthetic value with null
+            # compensation only (cannot guarantee monotonicity without the baseline).
+            share = 0.0
+            non_null_fraction = 1.0 - null_frac
+            pool = _generate_mcv_values(table, column, data_type, self.seed)
+            value = pool[0] if pool else ""
+        if non_null_fraction <= 0.0 or not value:
+            return 0.0, value
+        target_non_null = target / non_null_fraction  # required dominant share among non-null rows
+        if target_non_null >= 1.0:
+            f1 = 1.0  # capped: realized share tops out at non_null_fraction (< target)
+        elif share >= 1.0:
+            f1 = 0.0
+        else:
+            f1 = (target_non_null - share) / (1.0 - share)
+        return max(0.0, min(1.0, f1)), value
 
     def _apply_explicit_top5_rules(self, schema: SchemaInfo) -> None:
         for qualified, cfg in self.explicit_top5_rules.items():
@@ -1746,6 +2078,7 @@ def rewrite_tbl_directory(
         mcv_cfg,
         null_marker=null_cfg.get("null_marker", ""),
         source_data_dir=output_path,
+        null_probabilities=null_injector.null_probabilities(),
     )
     has_mcv_rules = mcv_injector.enabled and mcv_injector.has_rules
 
@@ -2099,6 +2432,7 @@ def build_rewrite_rules(
         mcv_cfg,
         null_marker=null_cfg.get("null_marker", ""),
         source_data_dir=source_data_dir,
+        null_probabilities=null_injector.null_probabilities(),
     )
 
     def _serialize_null_rules() -> Dict[str, List[Dict[str, Any]]]:

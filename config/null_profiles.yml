@@ -228,7 +228,11 @@ profiles:
 
   fleet_realworld_final:
     # Target share of ALL columns that receive non-zero NULL probability.
-    column_selection_fraction: 0.24
+    # Bumped 0.24 -> 0.26 (2026-06-02): now that the exclusion list is always honored
+    # (query-critical columns + date_dim/time_dim stay dense), those columns drop out
+    # of the nulled pool; the slightly higher fraction restores the production share
+    # (~12% of columns >= 0.5 null, top decile 60-100%) on the remaining safe columns.
+    column_selection_fraction: 0.26
     selection_fraction_scope: overall
     null_marker: ""
     exclude_tables:

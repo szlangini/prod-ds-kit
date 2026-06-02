@@ -5,7 +5,9 @@
 
 profiles:
   mcv_fleet_default:
-    column_selection_fraction: 0.70
+    # Full eligible coverage; the per-column target (max_value_buckets) decides how
+    # much each column is skewed, so coverage no longer needs to be throttled here.
+    column_selection_fraction: 1.0
     selection_fraction_scope: overall
     exclude_tables:
       - date_dim
@@ -61,35 +63,35 @@ profiles:
       - web_sales.ws_ext_wholesale_cost
       - web_sales.ws_ext_discount_amt
       - web_sales.ws_ext_sales_price
-    top20_buckets:
-      - weight: 0.35
-        min: 0.00
-        max: 0.05
-      - weight: 0.20
-        min: 0.05
-        max: 0.20
-      - weight: 0.20
-        min: 0.20
-        max: 0.60
-      - weight: 0.20
-        min: 0.60
-        max: 0.95
+    # Target distribution of the TOP-1 (max-value) share -- the fraction of total
+    # rows the single most-common value occupies. This is exactly what the Redshift
+    # "Maximum MCV frequency" curve measures. Calibrated 2026-06 to the fleet mid-tail
+    # (>=0.30~49, >=0.50~41) while staying deliberately conservative at the extreme
+    # (>=0.70/>=0.90 above the TPC-DS base but well below the fleet, per paper 5.2.6).
+    # Injection reuses each column's natural dominant value and is null-compensated +
+    # monotonic, so these are realized targets over total rows -- not raw cell rates.
+    max_value_buckets:
+      - weight: 0.03
+        min: 0.01
+        max: 0.10
       - weight: 0.05
-        min: 0.95
-        max: 0.999
-    r_buckets:
-      - weight: 0.25
         min: 0.10
         max: 0.30
-      - weight: 0.45
+      - weight: 0.12
         min: 0.30
-        max: 0.65
-      - weight: 0.30
-        min: 0.65
-        max: 0.95
+        max: 0.50
+      - weight: 0.35
+        min: 0.50
+        max: 0.70
+      - weight: 0.25
+        min: 0.70
+        max: 0.90
+      - weight: 0.20
+        min: 0.90
+        max: 0.99
 
   mcv_low:
-    column_selection_fraction: 0.35
+    column_selection_fraction: 0.45
     selection_fraction_scope: overall
     exclude_tables:
       - date_dim
@@ -145,35 +147,26 @@ profiles:
       - web_sales.ws_ext_wholesale_cost
       - web_sales.ws_ext_discount_amt
       - web_sales.ws_ext_sales_price
-    top20_buckets:
-      - weight: 0.50
-        min: 0.00
-        max: 0.05
-      - weight: 0.25
-        min: 0.05
-        max: 0.20
-      - weight: 0.15
-        min: 0.20
-        max: 0.40
-      - weight: 0.08
-        min: 0.40
-        max: 0.60
-      - weight: 0.02
-        min: 0.60
-        max: 0.80
-    r_buckets:
-      - weight: 0.25
+    # Low-skew tier: most mass in the mild [0.01, 0.30] range, little above 0.5.
+    max_value_buckets:
+      - weight: 0.30
+        min: 0.01
+        max: 0.10
+      - weight: 0.30
         min: 0.10
         max: 0.30
-      - weight: 0.45
+      - weight: 0.25
         min: 0.30
-        max: 0.65
-      - weight: 0.30
-        min: 0.65
-        max: 0.95
+        max: 0.50
+      - weight: 0.12
+        min: 0.50
+        max: 0.70
+      - weight: 0.03
+        min: 0.70
+        max: 0.85
 
   mcv_high:
-    column_selection_fraction: 0.90
+    column_selection_fraction: 1.0
     selection_fraction_scope: overall
     exclude_tables:
       - date_dim
@@ -229,32 +222,25 @@ profiles:
       - web_sales.ws_ext_wholesale_cost
       - web_sales.ws_ext_discount_amt
       - web_sales.ws_ext_sales_price
-    top20_buckets:
+    # High-skew tier: heavy mass at/above 0.5 and a real extreme tail toward the
+    # production curve (>=0.90 ~ fleet). Use with care -- aggressive max-value
+    # dominance can collapse predicate selectivity (see paper 5.2.6).
+    max_value_buckets:
+      - weight: 0.01
+        min: 0.01
+        max: 0.10
       - weight: 0.03
-        min: 0.00
-        max: 0.05
-      - weight: 0.05
-        min: 0.05
-        max: 0.20
-      - weight: 0.07
-        min: 0.20
-        max: 0.40
-      - weight: 0.30
-        min: 0.40
-        max: 0.60
-      - weight: 0.40
-        min: 0.60
-        max: 0.95
-      - weight: 0.15
-        min: 0.95
-        max: 0.99
-    r_buckets:
-      - weight: 0.25
         min: 0.10
         max: 0.30
-      - weight: 0.45
+      - weight: 0.06
         min: 0.30
-        max: 0.65
+        max: 0.50
+      - weight: 0.25
+        min: 0.50
+        max: 0.70
       - weight: 0.30
-        min: 0.65
-        max: 0.95
+        min: 0.70
+        max: 0.90
+      - weight: 0.35
+        min: 0.90
+        max: 0.99

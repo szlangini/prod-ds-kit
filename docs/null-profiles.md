@@ -10,6 +10,17 @@ attributes exists: above the 80th column percentile, NULL fractions rise sharply
 and the top 10% of columns are 60--100% NULL. Prod-DS injects NULLs according to
 configurable NULL profiles to reproduce this qualitative shape.
 
+## Relationship to MCV injection
+
+The production MCV metric (`max_value_share = max_count / total_rows`) counts NULLs
+in the denominator, so injecting a null fraction `f` into a column mechanically
+shrinks its max-value share by `(1 − f)`. To keep the two axes from fighting, the
+**MCV** injection is null-compensated and monotonic: it targets the share over
+*total* rows (dividing by the post-null non-null fraction) and only ever raises a
+column's dominant share. The NULL mechanism and profiles described here are
+therefore **unchanged**; the decoupling lives entirely on the MCV side (see
+[Appendix E](mcv-profiles.md)).
+
 ## Profile Tuple
 
 A NULL profile is defined as a tuple:
@@ -33,18 +44,25 @@ A column is eligible for NULL injection if all of the following hold:
 1. It is **not** a primary key or foreign key.
 2. It has **NDV >= 50** (low-cardinality columns are excluded because NULL
    injection would disproportionately distort their value distributions).
-3. It is **not** in the exclusion set `E`.
+3. It is **not** in the exclusion set `E`. As of 2026-06 this is honored in **both**
+   column pools (the hot-path flag no longer drops it): heavily nulling a calendar or
+   a query-critical filter column empties date- and value-filter queries, so these
+   stay dense.
 
 The exclusion set includes:
 
-- Entire tables: `date_dim`, `time_dim`.
+- Entire tables: `date_dim`, `time_dim` (calendars must stay dense — nulling
+  `d_date` was emptying every query that filters a specific date).
 - Specific columns used as critical filter or join predicates (e.g.,
   `item.i_category`, `store.s_state`, `customer_address.ca_state`,
   `customer_demographics.cd_gender`).
 - Measure columns that must remain dense for aggregation correctness (e.g.,
   `store_sales.ss_ext_sales_price`).
 
-The full exclusion list is defined in `config/null_profiles.yml`.
+The full exclusion list is defined in `config/null_profiles.yml`. Because these
+columns no longer carry NULLs, `fleet_realworld_final`'s `column_selection_fraction`
+was nudged 0.24 → 0.26 so the remaining (safe) columns still reproduce the
+production share (~12% of columns ≥ 0.5 NULL, top decile 60–100%).
 
 ## Per-Column Assignment Algorithm
 
@@ -102,7 +120,7 @@ preserving the same boundary structure.
 
 | Parameter              | Low    | Med     | High   |
 |------------------------|-------:|--------:|-------:|
-| Column fraction `f`    |   0.12 |    0.24 |   0.40 |
+| Column fraction `f`    |   0.12 |    0.26 |   0.40 |
 | Expected cell nullity  | 5--15% | 30--50% | 60--80%|
 
 ## Configuration Reference

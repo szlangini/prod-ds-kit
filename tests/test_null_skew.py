@@ -144,6 +144,12 @@ class NullSkewTests(unittest.TestCase):
             "max": max(sorted_probs),
         }
 
+        # Fixture refreshed 2026-06-02: NULL now always honors the exclusion list
+        # (date_dim/time_dim + query-critical columns stay dense), so those columns no
+        # longer carry NULLs and the per-column quantiles are computed over a column
+        # universe where calendars/filters are dense. The primary production figure
+        # (~12% of columns >= 0.5 NULL, top decile 60-100%) is preserved; these
+        # quantiles are the resulting deterministic shape and guard against drift.
         fixture_path = Path(__file__).resolve().parent / "fixtures" / "realworld_null_quantiles.json"
         target = json.load(fixture_path.open("r", encoding="utf-8"))
 
@@ -199,6 +205,9 @@ class NullSkewTests(unittest.TestCase):
                 out_dir,
                 max_workers=2,
                 enable_stringify=True,
+                # warehouse is only recast at full coverage; the default STR=5 covers
+                # only date/item/customer/store and would leave w_warehouse_sk numeric.
+                stringification_level=10,
                 enable_nulls=True,
                 null_marker="\\N",
                 null_overrides=overrides,
@@ -241,7 +250,7 @@ class NullTierTests(unittest.TestCase):
 
     TIER_PROFILES = [
         ("null_low", 0.12),
-        ("fleet_realworld_final", 0.24),
+        ("fleet_realworld_final", 0.26),
         ("null_high", 0.40),
     ]
 

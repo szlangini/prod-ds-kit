@@ -89,6 +89,15 @@ class StringifyCppMoreTests(unittest.TestCase):
                 for target in (py_dir, cpp_dir):
                     (target / f"{table}.tbl").write_text("".join(rows), encoding="utf-8")
 
+            # Re-export with data present so MCV natural-value rules are reproducible.
+            stringify.export_rewrite_rules(
+                rules_path,
+                stringification_level=10,
+                enable_nulls=True,
+                enable_mcv=True,
+                source_data_dir=cpp_dir,
+            )
+
             stringify.rewrite_tbl_directory(
                 py_dir,
                 stringification_level=10,
@@ -139,6 +148,15 @@ class StringifyCppMoreTests(unittest.TestCase):
             filename = f"{table}_001.tbl"
             for target in (py_dir, cpp_dir):
                 (target / filename).write_text("|".join(row) + "|\n", encoding="utf-8")
+
+            # Re-export with data present so MCV natural-value rules are reproducible.
+            stringify.export_rewrite_rules(
+                rules_path,
+                stringification_level=10,
+                enable_nulls=True,
+                enable_mcv=True,
+                source_data_dir=cpp_dir,
+            )
 
             stringify.rewrite_tbl_directory(
                 py_dir,
@@ -257,13 +275,13 @@ class StringifyCppMoreTests(unittest.TestCase):
             for target in (py_dir, cpp_dir):
                 (target / "customer.dat").write_text(row, encoding="utf-8")
 
+            # Value-length amplification is now the separate STRLEN axis (strlen=2 with
+            # pad_step 2 -> a "~XXXX" suffix), not the legacy level>10 str_plus path.
             rules_path = base / "rules.yml"
             stringify.export_rewrite_rules(
                 rules_path,
-                stringification_level=12,
-                allow_extended_levels=True,
-                str_plus_enabled=True,
-                str_plus_max_level=20,
+                stringification_level=10,
+                strlen=2,
                 str_plus_pad_step=2,
                 str_plus_separator="~",
                 str_plus_marker="X",
@@ -274,10 +292,8 @@ class StringifyCppMoreTests(unittest.TestCase):
             stringify.rewrite_tbl_directory(
                 py_dir,
                 backend="python",
-                stringification_level=12,
-                allow_extended_levels=True,
-                str_plus_enabled=True,
-                str_plus_max_level=20,
+                stringification_level=10,
+                strlen=2,
                 str_plus_pad_step=2,
                 str_plus_separator="~",
                 str_plus_marker="X",

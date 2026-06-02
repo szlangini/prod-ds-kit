@@ -80,6 +80,18 @@ class StringifyCppGoldenTests(unittest.TestCase):
             for target in (py_dir, cpp_dir):
                 (target / f"{table}.tbl").write_text("".join(rows), encoding="utf-8")
 
+            # MCV now reuses each column's natural dominant value, so the rules depend
+            # on the data. Re-export with the data present so the C++ backend (which
+            # consumes this rules file) and the Python backend (which rescans py_dir,
+            # holding identical data) derive identical rules.
+            stringify.export_rewrite_rules(
+                rules_path,
+                stringification_level=10,
+                enable_nulls=True,
+                enable_mcv=True,
+                source_data_dir=cpp_dir,
+            )
+
             stringify.rewrite_tbl_directory(
                 py_dir,
                 stringification_level=10,
