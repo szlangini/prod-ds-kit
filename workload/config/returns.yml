@@ -81,7 +81,7 @@ cohort_predicates:
   - "i_category IN ('Home','Electronics')"
   - "i_brand LIKE 'Brand#1%'"
   - "i_color IN ('red','blue','black')"
-  - "i_manufact_id LIKE '%1'"            # str10: i_manufact_id is varchar
+  - "i_manufact LIKE '%a%'"            # str-safe: i_manufact (name) is varchar at all STR levels
   - "store_state IN ('CA','NY','TX')"
   - "cust_state IN ('CA','TX','NY')"
   - "reason_desc LIKE 'Did not%'"
@@ -95,7 +95,7 @@ cohort_predicates:
   - "cd_education_status LIKE '%Degree%'"
   - "hd_dep_count >= 2"
   - "hd_vehicle_count >= 2"
-  - "income_band LIKE '%0'"              # str10: income_band is varchar
+  - "cd_credit_rating IN ('Low Risk','High Risk')"              # str-safe: cd_credit_rating is varchar at all STR levels
   - "cust_zip LIKE '9%'"
   - "i_class IN ('regular','economy')"
   - "store_name LIKE 'ese%'"
