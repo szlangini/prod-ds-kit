@@ -353,9 +353,10 @@ generate_all_data() {
     # Prod-DS default STR=$PRODDS_STR (5 = production optimum; used by E1, E2, E3)
     generate_data_variant "$(data_dir prodds_sf${SF}_str${PRODDS_STR})" "$PRODDS_STR"
 
-    # E4: Stringification type-coverage sweep (STR 1-10)
-    # Always generate during --init so that a later --all run has data ready.
-    if $INIT || echo "$EXPERIMENTS" | grep -qw "E4"; then
+    # E4: Stringification type-coverage sweep (STR 1-10) — only when E4 is requested.
+    # (All 10 levels at SF100 would be ~500 GB; E4 runs at SF10. Pair --init with the
+    #  experiment selection, e.g. `--init --all` or `--init --experiment E4`.)
+    if echo "$EXPERIMENTS" | grep -qw "E4"; then
         for str in $E4_LEVELS; do
             generate_data_variant "$(data_dir str_sweep/str${str})" "$str"
         done
@@ -365,8 +366,8 @@ generate_all_data() {
         done
     fi
 
-    # E5: Sparsity & skew variants (at the default STR level)
-    if $INIT || echo "$EXPERIMENTS" | grep -qw "E5"; then
+    # E5: Sparsity & skew variants (at the default STR level) — only when E5 is requested.
+    if echo "$EXPERIMENTS" | grep -qw "E5"; then
         generate_data_variant "$(data_dir sparsity/baseline)" "$PRODDS_STR" --disable-null-skew --disable-mcv-skew
         generate_data_variant "$(data_dir sparsity/sparsity_only)" "$PRODDS_STR" --disable-mcv-skew
         generate_data_variant "$(data_dir sparsity/skew_only)" "$PRODDS_STR" --disable-null-skew

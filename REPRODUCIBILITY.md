@@ -43,8 +43,7 @@ a single repetition. Results appear in `.reproduce/sf1/results/`.
 A practical configuration for reviewers with a 64 GB machine.
 
 ```bash
-./reproduce.sh --init --sf 10 --engines duckdb
-./reproduce.sh --all --sf 10 --engines duckdb --reps 3
+./reproduce.sh --init --all --sf 10 --engines duckdb --reps 3
 ```
 
 This runs all five experiments at SF=10 with three repetitions each.
@@ -55,8 +54,7 @@ Reproduces the paper results exactly. Requires ~1 TiB RAM, ~500 GB disk,
 and all three engines installed.
 
 ```bash
-./reproduce.sh --init --sf 100 --engines all --reps 10
-./reproduce.sh --all --sf 100 --engines all --reps 10
+./reproduce.sh --init --all --sf 100 --engines all --reps 10
 ```
 
 ## Experiments
