@@ -545,6 +545,7 @@ apply_dialect_fixes() {
     local engine="$1"
     local query_dir="$2"
     local suite="$3"  # tpcds or prodds
+    local str_level="${4:-10}"  # active STR level (overlay variants were authored for STR=10)
 
     [ -d "$query_dir" ] || return 0
 
@@ -569,11 +570,16 @@ apply_dialect_fixes() {
             # stringified Prod-DS queries instead of vanilla TPC-DS queries.
             # Patterns: stringified IDs ('MFG_...', 'i00000...'), Prod-DS columns,
             # regexp_replace wrappers around surrogate keys.
-            if [ "$suite" = "tpcds" ]; then
+            # Overlay variants were authored at STR=10 (all 131 columns stringified).
+            # Skip any that bake in stringified literals when those columns are NOT
+            # stringified at the active level: always for vanilla TPC-DS, and for
+            # Prod-DS below STR=10. The freshly generated query is correct for the
+            # level, and the _ext templates already carry the structural fixes.
+            if [ "$suite" = "tpcds" ] || { [ "$suite" = "prodds" ] && [ "$str_level" -lt 10 ]; }; then
                 if grep -qiE "'(MFG|MGR|MKT|CLR|SIZ|BRD|CAT|CLS|DIV)_[0-9]|'[a-z][0-9]{4,}" "$variant" 2>/dev/null || \
                    grep -q "c_last_review_date[^_]" "$variant" 2>/dev/null || \
                    grep -q "regexp_replace.*'g'" "$variant" 2>/dev/null; then
-                    warn "Skipping contaminated TPC-DS variant: $(basename "$variant")"
+                    warn "Skipping STR=10-era overlay for $suite (active STR=$str_level): $(basename "$variant")"
                     continue
                 fi
             fi
@@ -669,8 +675,8 @@ apply_all_dialect_fixes() {
 
     IFS=',' read -ra engine_list <<< "$ENGINES"
     for engine in "${engine_list[@]}"; do
-        apply_dialect_fixes "$engine" "$(queries_dir ${engine}/tpcds)" "tpcds"
-        apply_dialect_fixes "$engine" "$(queries_dir ${engine}/prodds)" "prodds"
+        apply_dialect_fixes "$engine" "$(queries_dir ${engine}/tpcds)" "tpcds" 1
+        apply_dialect_fixes "$engine" "$(queries_dir ${engine}/prodds)" "prodds" "$PRODDS_STR"
     done
 
     ok "Dialect fixes applied."
@@ -1235,8 +1241,8 @@ main() {
             fi
             # Always apply dialect fixes (idempotent) — even if queries existed
             # from a previous partial run that may not have completed the fix step
-            apply_dialect_fixes "$engine" "$(queries_dir ${engine}/tpcds)" "tpcds"
-            apply_dialect_fixes "$engine" "$(queries_dir ${engine}/prodds)" "prodds"
+            apply_dialect_fixes "$engine" "$(queries_dir ${engine}/tpcds)" "tpcds" 1
+            apply_dialect_fixes "$engine" "$(queries_dir ${engine}/prodds)" "prodds" "$PRODDS_STR"
         done
         # E2/E3 micro-suites
         if echo "$EXPERIMENTS" | grep -qw "E2"; then
