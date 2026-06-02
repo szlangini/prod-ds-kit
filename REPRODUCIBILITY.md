@@ -36,7 +36,7 @@ A minimal run to verify the pipeline works end-to-end on a single engine.
 ```
 
 This generates SF=1 data, loads it into DuckDB, and runs Experiment E1 with
-a single repetition. Results appear in `.reproduce/results/`.
+a single repetition. Results appear in `.reproduce/sf1/results/`.
 
 ## Recommended Review Run (SF=10, ~4-8 hours)
 
@@ -66,7 +66,7 @@ and all three engines installed.
 | E1 | 6.5          | End-to-end TPC-DS vs Prod-DS             | DuckDB, CedarDB, MonetDB | Fig. 8, 9, 10 |
 | E2 | 6.6          | Join-scaling micro-suite (J=16..2048)    | All                  | Fig. 11        |
 | E3 | 6.7          | UNION ALL fan-in scaling (U=2..2048)     | All                  | Fig. 12        |
-| E4 | 6.8          | Stringification sweep (STR=1..10)        | DuckDB               | Fig. 13        |
+| E4 | 6.8          | Stringification sweep (STR=1..10) + STRLEN add-on | DuckDB      | Fig. 13        |
 | E5 | 6.9          | Sparsity and skew sensitivity            | DuckDB, CedarDB      | Table 3        |
 
 Individual experiments can be run selectively:
@@ -128,19 +128,21 @@ All artifacts are written to the `.reproduce/` directory:
 
 ```
 .reproduce/
-  data/              # Generated TPC-DS + Prod-DS data files
-  queries/           # Generated SQL queries (TPC-DS and extended)
-  databases/         # Engine-specific database files (e.g., DuckDB .db)
-  configs/           # Auto-generated experiment configurations
-  results/
-    E1/
-      raw.jsonl      # Per-query, per-repetition timing records
-      summary.csv    # Aggregated results (median, p5, p95)
-    E2/
-      raw.jsonl
-      summary.csv
-    ...
-    plots/           # Generated figures (PDF and PNG)
+  engines/               # Engine binaries (shared across scale factors)
+  sf<N>/                 # Per-scale-factor work tree (e.g. sf10, sf100) — no cross-SF reuse
+    data/                # Generated TPC-DS + Prod-DS data files (+ per-STR-level _schema.sql)
+    queries/             # Generated SQL queries (TPC-DS and extended)
+    databases/           # Engine-specific database files (e.g., DuckDB .db)
+    configs/             # Auto-generated experiment configurations
+    results/
+      E1/
+        raw.jsonl        # Per-query, per-repetition timing records
+        summary.csv      # Aggregated results (median, p5, p95)
+      E2/
+        raw.jsonl
+        summary.csv
+      ...
+      plots/             # Generated figures (PDF and PNG)
 ```
 
 **Result format:**

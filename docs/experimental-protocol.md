@@ -35,9 +35,9 @@ Mechanism-first, reproducible, one-engine-at-a-time execution.
 
 Authoritative data roots:
 
-- `$DATA_ROOT/tpcds/sf100`
-- `$DATA_ROOT/prodds/sf100/str1`
-- `$DATA_ROOT/prodds/sf100/str10`
+- `$DATA_ROOT/tpcds/sf100`                   (vanilla baseline, STR1)
+- `$DATA_ROOT/prodds/sf100/str5`             (default Prod-DS = production optimum)
+- `$DATA_ROOT/prodds/sf100/str1` … `str10`   (E4 stringification type-coverage sweep; str10 = full)
 
 No data is copied into the repository.
 
@@ -110,7 +110,7 @@ Runner: `python -m experiments run --experiment workload_compare`
 
 ### E2 -- End-to-End Timing
 
-- Suites: `tpcds`, `prodds` (STR10).
+- Suites: `tpcds`, `prodds` (STR5, the default production optimum).
 - Report per-query medians and workload median totals.
 
 Runner: `python -m experiments run --experiment workload_compare`

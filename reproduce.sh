@@ -41,7 +41,9 @@ REPS=3
 WARMUP=1
 TIMEOUT=1800
 THREADS=""  # auto-detect
-E4_LEVELS="${E4_LEVELS:-$(seq 1 15)}"  # STR levels for E4 (override to e.g. "1 5 10 15")
+PRODDS_STR="${PRODDS_STR:-5}"            # Default Prod-DS STR level (type coverage; 5 = production optimum, was 10 pre-revision)
+E4_LEVELS="${E4_LEVELS:-$(seq 1 10)}"    # E4 STR type-coverage sweep (1-10)
+E4_STRLEN_LEVELS="${E4_STRLEN_LEVELS:-2 4}"  # E4 STRLEN length add-on at STR=$PRODDS_STR (DuckDB only; set "" to disable)
 
 # Engine versions (matching paper Section 6.1–6.2)
 DUCKDB_VERSION="${DUCKDB_VERSION:-1.4.4}"
@@ -108,12 +110,15 @@ parse_args() {
 # ──────────────────────────────────────────────────────────────
 # Path helpers
 # ──────────────────────────────────────────────────────────────
-data_dir()    { echo "$WORK_DIR/data/$1"; }
-queries_dir() { echo "$WORK_DIR/queries/$1"; }
-db_dir()      { echo "$WORK_DIR/databases"; }
+# SF-scoped work tree: SF10 and SF100 get separate data/query/result trees so a later
+# run never silently reuses another SF's cached queries or data. engines_dir is kept
+# SF-independent so engine binaries are installed once.
+data_dir()    { echo "$WORK_DIR/sf${SF}/data/$1"; }
+queries_dir() { echo "$WORK_DIR/sf${SF}/queries/$1"; }
+db_dir()      { echo "$WORK_DIR/sf${SF}/databases"; }
 engines_dir() { echo "$WORK_DIR/engines"; }
-configs_dir() { echo "$WORK_DIR/configs"; }
-results_dir() { echo "$WORK_DIR/results"; }
+configs_dir() { echo "$WORK_DIR/sf${SF}/configs"; }
+results_dir() { echo "$WORK_DIR/sf${SF}/results"; }
 
 activate_venv() {
     if [ -f "$VENV_DIR/bin/activate" ]; then
@@ -311,12 +316,19 @@ generate_data_variant() {
     shift 2
     local extra_flags=("$@")
 
+    mkdir -p "$out_dir"
+
+    # Emit the matching per-STR-level schema next to the data; loaders consume it via
+    # SCHEMA_FILE (load_engine_data). Without this, every STR>1 variant would load against
+    # the full str10 tools/prodds.sql, which is only correct for STR=10.
+    python3 "$ROOT_DIR/tools/generate_tpcds_schema.py" \
+        --stringification-level "$str_level" --out "$out_dir/_schema.sql" >/dev/null
+
     if [ -d "$out_dir" ] && ls "$out_dir"/*.dat 1>/dev/null 2>&1; then
-        info "Data already exists at $out_dir — skipping."
+        info "Data already exists at $out_dir — skipping data gen (schema refreshed)."
         return
     fi
 
-    mkdir -p "$out_dir"
     info "Generating data: STR=$str_level SF=$SF → $out_dir"
 
     local cmd=(python3 "$ROOT_DIR/wrap_dsdgen.py"
@@ -338,25 +350,29 @@ generate_all_data() {
     # TPC-DS vanilla (used by E1)
     generate_data_variant "$(data_dir tpcds_sf${SF})" 1 --disable-null-skew --disable-mcv-skew
 
-    # Prod-DS default STR=10 (used by E1, E2, E3)
-    generate_data_variant "$(data_dir prodds_sf${SF}_str10)" 10
+    # Prod-DS default STR=$PRODDS_STR (5 = production optimum; used by E1, E2, E3)
+    generate_data_variant "$(data_dir prodds_sf${SF}_str${PRODDS_STR})" "$PRODDS_STR"
 
-    # E4: Stringification sweep
+    # E4: Stringification type-coverage sweep (STR 1-10)
     # Always generate during --init so that a later --all run has data ready.
     if $INIT || echo "$EXPERIMENTS" | grep -qw "E4"; then
         for str in $E4_LEVELS; do
             generate_data_variant "$(data_dir str_sweep/str${str})" "$str"
         done
+        # E4 STRLEN length add-on at the default STR level (orthogonal length axis)
+        for len in $E4_STRLEN_LEVELS; do
+            generate_data_variant "$(data_dir str_sweep/str${PRODDS_STR}_len${len})" "$PRODDS_STR" --strlen "$len"
+        done
     fi
 
-    # E5: Sparsity & skew variants
+    # E5: Sparsity & skew variants (at the default STR level)
     if $INIT || echo "$EXPERIMENTS" | grep -qw "E5"; then
-        generate_data_variant "$(data_dir sparsity/baseline)" 10 --disable-null-skew --disable-mcv-skew
-        generate_data_variant "$(data_dir sparsity/sparsity_only)" 10 --disable-mcv-skew
-        generate_data_variant "$(data_dir sparsity/skew_only)" 10 --disable-null-skew
+        generate_data_variant "$(data_dir sparsity/baseline)" "$PRODDS_STR" --disable-null-skew --disable-mcv-skew
+        generate_data_variant "$(data_dir sparsity/sparsity_only)" "$PRODDS_STR" --disable-mcv-skew
+        generate_data_variant "$(data_dir sparsity/skew_only)" "$PRODDS_STR" --disable-null-skew
         # Combined is the same as default Prod-DS
         if [ ! -d "$(data_dir sparsity/combined)" ]; then
-            ln -sfn "$(data_dir prodds_sf${SF}_str10)" "$(data_dir sparsity/combined)"
+            ln -sfn "$(data_dir prodds_sf${SF}_str${PRODDS_STR})" "$(data_dir sparsity/combined)"
         fi
     fi
 }
@@ -404,8 +420,8 @@ generate_all_queries() {
         # TPC-DS vanilla queries (no extensions)
         generate_queries_variant "$(queries_dir ${engine}/tpcds)" 1 --no-extensions --dialect "$dialect"
 
-        # Prod-DS extended queries (STR=10)
-        generate_queries_variant "$(queries_dir ${engine}/prodds)" 10 --dialect "$dialect"
+        # Prod-DS extended queries (STR=$PRODDS_STR)
+        generate_queries_variant "$(queries_dir ${engine}/prodds)" "$PRODDS_STR" --dialect "$dialect"
     done
 
     # Join-scaling micro-suite (E2) — via wrap_dsqgen.py --join-only
@@ -420,7 +436,7 @@ generate_all_queries() {
                 --join-only \
                 --join-targets "16,32,64,128,256,512,1024,2048" \
                 --scale "$SF" \
-                --stringification-level 10
+                --stringification-level "$PRODDS_STR"
             ok "Join-scaling queries generated."
         fi
     fi
@@ -438,7 +454,7 @@ generate_all_queries() {
                 --union-max-inputs 2048 \
                 --no-join \
                 --scale "$SF" \
-                --stringification-level 10 \
+                --stringification-level "$PRODDS_STR" \
                 --dialect duckdb
             # Remove base Prod-DS queries — E3 should only contain union micro-suite
             local before_count after_count
@@ -464,6 +480,10 @@ generate_all_queries() {
     if echo "$EXPERIMENTS" | grep -qw "E4"; then
         for str in $E4_LEVELS; do
             generate_queries_variant "$(queries_dir duckdb/str_sweep/str${str})" "$str" --dialect duckdb
+        done
+        # E4 STRLEN length add-on (queries at STR=$PRODDS_STR with --strlen)
+        for len in $E4_STRLEN_LEVELS; do
+            generate_queries_variant "$(queries_dir duckdb/str_sweep/str${PRODDS_STR}_len${len})" "$PRODDS_STR" --strlen "$len" --dialect duckdb
         done
     fi
 
@@ -806,7 +826,15 @@ load_engine_data() {
     local engine="$1"
     local data_dir="$2"
     local str_level="$3"
-    local db_label="$4"  # e.g., tpcds_sf1, prodds_sf1_str10
+    local db_label="$4"  # e.g., tpcds_sf1, prodds_sf1_str5
+
+    # Use the per-STR-level schema emitted next to the data by generate_data_variant.
+    # Falls back to the loader's built-in tools/{tpcds,prodds}.sql only if absent.
+    if [ -f "${data_dir}/_schema.sql" ]; then
+        export SCHEMA_FILE="${data_dir}/_schema.sql"
+    else
+        unset SCHEMA_FILE
+    fi
 
     case "$engine" in
         duckdb)
@@ -965,7 +993,7 @@ run_e1() {
         # Load TPC-DS data
         load_engine_data "$engine" "$(data_dir tpcds_sf${SF})" 1 "tpcds_sf${SF}"
         # Load Prod-DS data
-        load_engine_data "$engine" "$(data_dir prodds_sf${SF}_str10)" 10 "prodds_sf${SF}_str10"
+        load_engine_data "$engine" "$(data_dir prodds_sf${SF}_str${PRODDS_STR})" "$PRODDS_STR" "prodds_sf${SF}_str${PRODDS_STR}"
 
         # Run TPC-DS suite
         info "E1/$engine: Running TPC-DS workload..."
@@ -977,7 +1005,7 @@ run_e1() {
         info "E1/$engine: Running Prod-DS workload..."
         run_workload_on_engine "$engine" \
             "$empty_dir" "$(queries_dir ${engine}/prodds)" \
-            "$exp_results/${engine}_prodds" "prodds_sf${SF}_str10"
+            "$exp_results/${engine}_prodds" "prodds_sf${SF}_str${PRODDS_STR}"
 
         # Stop server engines between engines (isolation)
         case "$engine" in
@@ -1006,11 +1034,11 @@ run_e2() {
         fi
         info "Running E2 on $engine..."
 
-        load_engine_data "$engine" "$(data_dir prodds_sf${SF}_str10)" 10 "prodds_sf${SF}_str10"
+        load_engine_data "$engine" "$(data_dir prodds_sf${SF}_str${PRODDS_STR})" "$PRODDS_STR" "prodds_sf${SF}_str${PRODDS_STR}"
 
         run_workload_on_engine "$engine" \
             "$empty_dir" "$(queries_dir join_scaling)" \
-            "$exp_results/$engine" "prodds_sf${SF}_str10"
+            "$exp_results/$engine" "prodds_sf${SF}_str${PRODDS_STR}"
 
         case "$engine" in
             cedardb) stop_cedardb ;;
@@ -1038,7 +1066,7 @@ run_e3() {
         fi
         info "Running E3 on $engine..."
 
-        load_engine_data "$engine" "$(data_dir prodds_sf${SF}_str10)" 10 "prodds_sf${SF}_str10"
+        load_engine_data "$engine" "$(data_dir prodds_sf${SF}_str${PRODDS_STR})" "$PRODDS_STR" "prodds_sf${SF}_str${PRODDS_STR}"
 
         # MonetDB uses CTE-inlined variants (optimizer bug workaround)
         local union_dir="$(queries_dir union_scaling)"
@@ -1048,7 +1076,7 @@ run_e3() {
 
         run_workload_on_engine "$engine" \
             "$empty_dir" "$union_dir" \
-            "$exp_results/$engine" "prodds_sf${SF}_str10"
+            "$exp_results/$engine" "prodds_sf${SF}_str${PRODDS_STR}"
 
         case "$engine" in
             cedardb) stop_cedardb ;;
@@ -1060,7 +1088,7 @@ run_e3() {
 }
 
 run_e4() {
-    step "E4: Stringification sweep STR=1..15 (Section 6.8, DuckDB only)"
+    step "E4: Stringification sweep — STR 1..10 type coverage + STRLEN add-on (Section 6.8, DuckDB only)"
     activate_venv
 
     local exp_results
@@ -1076,6 +1104,18 @@ run_e4() {
         run_workload_on_engine "duckdb" \
             "$empty_dir" "$(queries_dir duckdb/str_sweep/str${str})" \
             "$exp_results/str${str}" "str_sweep_sf${SF}_str${str}"
+    done
+
+    # STRLEN length add-on at the default STR level (orthogonal length axis)
+    for len in $E4_STRLEN_LEVELS; do
+        local lbl="str${PRODDS_STR}_len${len}"
+        info "E4: STRLEN=$len at STR=$PRODDS_STR (levels: $E4_STRLEN_LEVELS)"
+
+        load_engine_data "duckdb" "$(data_dir str_sweep/${lbl})" "$PRODDS_STR" "str_sweep_sf${SF}_${lbl}"
+
+        run_workload_on_engine "duckdb" \
+            "$empty_dir" "$(queries_dir duckdb/str_sweep/${lbl})" \
+            "$exp_results/${lbl}" "str_sweep_sf${SF}_${lbl}"
     done
 
     ok "E4 complete. Results in $exp_results"
@@ -1109,7 +1149,7 @@ run_e5() {
             fi
 
             local db_label="sparsity_sf${SF}_${variant}"
-            load_engine_data "$engine" "$(data_dir sparsity/${variant})" 10 "$db_label"
+            load_engine_data "$engine" "$(data_dir sparsity/${variant})" "$PRODDS_STR" "$db_label"
 
             run_workload_on_engine "$engine" \
                 "$empty_dir" "$(queries_dir ${engine}/prodds)" \
@@ -1190,7 +1230,7 @@ main() {
                 generate_queries_variant "$(queries_dir ${engine}/tpcds)" 1 --no-extensions --dialect "$dialect"
             fi
             if [ ! -d "$(queries_dir ${engine}/prodds)" ]; then
-                generate_queries_variant "$(queries_dir ${engine}/prodds)" 10 --dialect "$dialect"
+                generate_queries_variant "$(queries_dir ${engine}/prodds)" "$PRODDS_STR" --dialect "$dialect"
             fi
             # Always apply dialect fixes (idempotent) — even if queries existed
             # from a previous partial run that may not have completed the fix step
