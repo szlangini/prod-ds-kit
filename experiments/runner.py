@@ -383,6 +383,10 @@ class BenchmarkRunner:
         fail_on_empty = bool(validation_cfg.get("fail_on_empty", True))
         fail_on_too_large = bool(validation_cfg.get("fail_on_too_large", False))
         fail_on_large_sql = bool(validation_cfg.get("fail_on_large_sql", False))
+        # Early-abandon: once a query times out / errors / crashes on a rep, the
+        # remaining reps are redundant (they recur) and at reps=10/SF100 a single
+        # 1800 s timeout would otherwise burn ~5 h. Record it once and move on.
+        early_abandon = bool((self.cfg.raw.get("global") or {}).get("early_abandon_on_failure", True))
 
         for query in queries:
             validation_key = self._validation_key(query)
@@ -428,6 +432,8 @@ class BenchmarkRunner:
                     )
                     writer.write(record)
                     records.append(record)
+                    if early_abandon:
+                        break
                     continue
 
                 result = adapter.run_sql(query.sql or "")
@@ -458,6 +464,15 @@ class BenchmarkRunner:
                 if result.status == "engine_crash":
                     self.logger.warning("Engine crash detected. Restarting %s.", adapter.name)
                     adapter.restart()
+
+                if early_abandon and result.status != "success":
+                    skipped = repetitions - rep
+                    if skipped > 0:
+                        self.logger.info(
+                            "%s: %s on rep %d — skipping remaining %d reps (early abandon).",
+                            query.query_id, result.status, rep, skipped,
+                        )
+                    break
 
         return run_index, records
 
