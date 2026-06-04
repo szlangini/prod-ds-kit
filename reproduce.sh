@@ -146,6 +146,9 @@ cedardb_bin() {
     engines="$(engines_dir)"
     if [ -x "$engines/cedardb/cedardb" ]; then
         echo "$engines/cedardb/cedardb"
+    elif [ -x "$engines/cedardb/cedar/cedardb" ]; then
+        # install_cedardb extracts the tarball into a cedar/ subdir
+        echo "$engines/cedardb/cedar/cedardb"
     elif command -v cedardb >/dev/null 2>&1; then
         command -v cedardb
     else
