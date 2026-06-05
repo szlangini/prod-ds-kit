@@ -1168,6 +1168,13 @@ run_e5() {
             case "$engine" in
                 cedardb) stop_cedardb ;;
             esac
+
+            # Free the just-measured DuckDB variant DB. E5 loads up to 4 variants;
+            # at SF100 (~60 GB each) keeping them all would exhaust disk. The DB is a
+            # throwaway load of the variant data (which is kept), so this is safe.
+            if [ "$engine" = "duckdb" ]; then
+                rm -f "$(db_dir)/duckdb/${db_label}.duckdb"
+            fi
         done
     done
 
