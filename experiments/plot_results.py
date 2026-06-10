@@ -28,16 +28,20 @@ import matplotlib.ticker as ticker
 import numpy as np
 
 # ── Colour palette (engine branding) ────────────────────────────
+# Engine line/bar colours — sampled from the published paper figures
+# (benchmark_paper_new.pdf Fig 8/9/11/12) so regenerated plots match it exactly.
 ENGINE_COLORS: Dict[str, str] = {
-    "duckdb":  "#FF6B00",
-    "cedardb": "#2196F3",
-    "monetdb": "#4CAF50",
+    "duckdb":  "#58b4dd",   # paper blue
+    "cedardb": "#ff9800",   # paper orange
+    "monetdb": "#96bf3d",   # paper green
+    "postgres": "#9c27b0",  # purple — not in the paper (3-engine figs); distinct 4th
 }
-ENGINE_ORDER = ["duckdb", "cedardb", "monetdb"]
+ENGINE_ORDER = ["duckdb", "cedardb", "monetdb", "postgres"]
 ENGINE_LABELS: Dict[str, str] = {
     "duckdb":  "DuckDB",
     "cedardb": "CedarDB",
     "monetdb": "MonetDB",
+    "postgres": "PostgreSQL",
 }
 
 SUITE_COLORS = {
@@ -150,28 +154,45 @@ def engine_label(name: str) -> str:
 
 # ── Style setup ─────────────────────────────────────────────────
 def apply_style() -> None:
+    # Calibrated to benchmark_paper_new.pdf (Fig 8-13): sans-serif, 10pt bold
+    # titles, 9pt labels, 8pt ticks, thin 0.6 spines, subtle dotted y-grid.
     plt.rcParams.update({
         "figure.facecolor":   "white",
         "axes.facecolor":     "white",
         "axes.edgecolor":     "#333333",
-        "axes.labelcolor":    "#333333",
-        "axes.labelsize":     11,
-        "axes.titlesize":     13,
+        "axes.labelcolor":    "#222222",
+        "font.family":        "sans-serif",
+        "font.sans-serif":    ["DejaVu Sans", "Arial", "Helvetica", "Liberation Sans"],
+        "font.size":          9,
+        "axes.titlesize":     10,
+        "axes.titleweight":   "bold",
+        "axes.labelsize":     9,
         "xtick.color":        "#333333",
         "ytick.color":        "#333333",
-        "xtick.labelsize":    9,
-        "ytick.labelsize":    9,
-        "legend.fontsize":    9,
-        "legend.framealpha":  0.9,
-        "legend.edgecolor":   "#cccccc",
-        "grid.alpha":         0.3,
-        "grid.color":         "#cccccc",
-        "grid.linestyle":     "--",
-        "font.family":        "sans-serif",
+        "xtick.labelsize":    8,
+        "ytick.labelsize":    8,
+        "legend.fontsize":    8,
+        "legend.framealpha":  0.95,
+        "legend.edgecolor":   "#bbbbbb",
+        "axes.linewidth":     0.6,
+        "xtick.major.width":  0.5,
+        "ytick.major.width":  0.5,
+        "xtick.major.size":   3.0,
+        "ytick.major.size":   3.0,
+        "axes.grid":          True,
+        "axes.grid.axis":     "y",
+        "axes.axisbelow":     True,
+        "grid.linestyle":     ":",
+        "grid.linewidth":     0.4,
+        "grid.color":         "#aaaaaa",
+        "grid.alpha":         0.7,
+        "pdf.fonttype":       42,
+        "ps.fonttype":        42,
+        "axes.unicode_minus": False,
         "figure.dpi":         150,
         "savefig.dpi":        200,
         "savefig.bbox":       "tight",
-        "savefig.pad_inches": 0.15,
+        "savefig.pad_inches": 0.05,
     })
 
 
@@ -180,6 +201,17 @@ def save_fig(fig: plt.Figure, output_dir: Path, name: str) -> None:
     fig.savefig(str(path))
     plt.close(fig)
     print(f"  saved {path}")
+
+
+def _fmt_seconds(v: float) -> str:
+    """Compact second-value label for bar tops (paper-style)."""
+    if v >= 100:
+        return f"{v:.0f}"
+    if v >= 10:
+        return f"{v:.1f}"
+    if v >= 1:
+        return f"{v:.2f}"
+    return f"{v:.3f}"
 
 
 # ── Data aggregation helpers ────────────────────────────────────
@@ -277,38 +309,54 @@ def plot_fig8_bar(summaries: Dict[str, Dict[str, List[Dict[str, Any]]]],
     bar_width = 0.35
     x = np.arange(len(engines))
 
-    fig, ax = plt.subplots(figsize=(5, 4))
+    fig, ax = plt.subplots(figsize=(5, 3.4))
 
     for i, suite in enumerate(suites):
         vals = []
         for eng in engines:
             rows = summaries.get(eng, {}).get(suite, [])
-            times = [safe_float(r.get("median_ms")) for r in rows]
-            times = [t for t in times if t is not None and t > 0]
+            times = [t for r in rows
+                     if (t := safe_float(r.get("median_ms"))) is not None and t > 0]
             if not times:
-                vals.append(0)
+                vals.append(0.0)
                 continue
+            # Paper plots SECONDS, not milliseconds.
             if agg == "median":
-                vals.append(float(np.median(times)))
+                vals.append(float(np.median(times)) / 1000.0)
             elif agg == "mean":
-                vals.append(float(np.mean(times)))
+                vals.append(float(np.mean(times)) / 1000.0)
             elif agg == "sum":
-                vals.append(float(np.sum(times)))
+                vals.append(float(np.sum(times)) / 1000.0)
             else:
-                vals.append(0)
+                vals.append(0.0)
 
+        # Paper convention: colour = ENGINE; the SUITE is shown by hatch
+        # (TPC-DS hatched, Prod-DS solid), NOT by colour.
         offset = (i - 0.5) * bar_width
-        bars = ax.bar(x + offset, vals, bar_width, label=SUITE_LABELS.get(suite, suite),
-                      color=SUITE_COLORS.get(suite, "#888"), edgecolor="white", linewidth=0.5)
+        hatch = "////" if suite == "tpcds" else ""
+        bars = ax.bar(x + offset, vals, bar_width,
+                      color=[engine_color(e) for e in engines],
+                      edgecolor="#333333", linewidth=0.5, hatch=hatch)
+        for rect, v in zip(bars, vals):
+            if v > 0:
+                ax.text(rect.get_x() + rect.get_width() / 2, v, _fmt_seconds(v),
+                        ha="center", va="bottom", fontsize=5.5)
 
     ax.set_yscale("log")
-    ax.set_ylabel("Runtime (ms)")
+    ax.set_ylabel("Query runtime (s)")
     ax.set_title(title)
     ax.set_xticks(x)
     ax.set_xticklabels([engine_label(e) for e in engines])
-    ax.legend()
+    # Legend keys the hatch to the suite (engine colour is read off the x-axis).
+    from matplotlib.patches import Patch
+    suite_handles = [
+        Patch(facecolor="#d9d9d9", edgecolor="#333333", hatch="////", label="TPC-DS"),
+        Patch(facecolor="#d9d9d9", edgecolor="#333333", label="Prod-DS"),
+    ]
+    ax.legend(handles=suite_handles, loc="upper left")
     ax.yaxis.set_minor_locator(ticker.LogLocator(subs="auto", numticks=20))
     ax.yaxis.set_minor_formatter(ticker.NullFormatter())
+    ax.set_ylim(top=ax.get_ylim()[1] * 2.5)  # headroom for value labels + legend
     fig.tight_layout()
     save_fig(fig, output_dir, fname)
 
@@ -321,7 +369,8 @@ def plot_fig9_cdf(summaries: Dict[str, Dict[str, List[Dict[str, Any]]]],
 
     for eng in ENGINE_ORDER:
         rows = summaries.get(eng, {}).get("prodds", [])
-        times = sorted(t for r in rows if (t := safe_float(r.get("median_ms"))) is not None and t > 0)
+        times = sorted(t / 1000.0 for r in rows
+                       if (t := safe_float(r.get("median_ms"))) is not None and t > 0)
         if not times:
             continue
         cdf_y = np.arange(1, len(times) + 1) / len(times)
@@ -334,7 +383,7 @@ def plot_fig9_cdf(summaries: Dict[str, Dict[str, List[Dict[str, Any]]]],
         return
 
     ax.set_xscale("log")
-    ax.set_xlabel("Median query runtime (ms)")
+    ax.set_xlabel("Per-query median runtime (s, log scale)")
     ax.set_ylabel("CDF")
     ax.set_title("Per-query runtime CDF on Prod-DS")
     ax.set_ylim(0, 1.02)
@@ -445,42 +494,74 @@ def _aggregate_by_level(records: List[Dict[str, Any]],
 
 
 def plot_fig11(e2_data: Dict[str, List[Dict[str, Any]]], output_dir: Path) -> None:
-    """Log-log: median execution and planning time vs join level."""
+    """One log-log diagram: join-scaling EXECUTION (solid) and PLANNING (dashed)
+    median time vs join level, per engine (colour). Both series share a single
+    millisecond y-axis, so planning and execution are read off the same scale."""
     engines = [e for e in ENGINE_ORDER if e in e2_data]
     if not engines:
         return
 
-    for time_field, suffix, ylabel, title in [
-        ("wall_time_ms_execution", "a_join_execution",
-         "Median execution time (ms)", "Join scaling: execution time"),
-        ("wall_time_ms_planning", "b_join_planning",
-         "Median planning time (ms)", "Join scaling: planning time"),
-    ]:
-        fig, ax = plt.subplots(figsize=(6, 4))
-        plotted = False
-        for eng in engines:
-            levels, meds = _aggregate_by_level(
-                e2_data[eng], _extract_join_level, time_field)
-            if not levels:
-                continue
-            ax.plot(levels, meds, "o-", label=engine_label(eng),
-                    color=engine_color(eng), linewidth=1.8, markersize=5)
+    fig, ax = plt.subplots(figsize=(6, 3.3))
+    plotted = False
+    for eng in engines:
+        col = engine_color(eng)
+        ex_levels, ex_meds = _aggregate_by_level(
+            e2_data[eng], _extract_join_level, "wall_time_ms_execution")
+        if ex_levels:
+            ax.plot(ex_levels, [m / 1000.0 for m in ex_meds], "o-", color=col,
+                    linewidth=1.8, markersize=5, label=engine_label(eng))
+            plotted = True
+        pl_levels, pl_meds = _aggregate_by_level(
+            e2_data[eng], _extract_join_level, "wall_time_ms_planning")
+        if pl_levels:
+            ax.plot(pl_levels, [m / 1000.0 for m in pl_meds], "s--", color=col,
+                    linewidth=1.5, markersize=4, label="_nolegend_")
             plotted = True
 
-        if not plotted:
-            plt.close(fig)
-            continue
+    if not plotted:
+        plt.close(fig)
+        return
 
-        ax.set_xscale("log", base=2)
-        ax.set_yscale("log")
-        ax.set_xlabel("Join level")
-        ax.set_ylabel(ylabel)
-        ax.set_title(title)
-        ax.legend()
-        ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
-        ax.xaxis.set_minor_formatter(ticker.NullFormatter())
-        fig.tight_layout()
-        save_fig(fig, output_dir, f"fig11{suffix}.png")
+    ax.set_xscale("log", base=2)
+    ax.set_yscale("log")
+    ax.set_xlabel("Join level")
+    ax.set_ylabel("Median time (s)")
+    ax.set_title("Join scaling: execution vs planning time")
+    ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
+    ax.xaxis.set_minor_formatter(ticker.NullFormatter())
+
+    # Two legends: engine colours (upper-left) + a line-style key (lower-right)
+    # telling execution (solid o) from planning (dashed s) — they share each
+    # engine's colour, so the style key is what disambiguates the two series.
+    from matplotlib.lines import Line2D
+    engine_handles, engine_names = ax.get_legend_handles_labels()
+    style_handles = [
+        Line2D([0], [0], color="#555555", linestyle="-", marker="o",
+               markersize=5, label="Execution"),
+        Line2D([0], [0], color="#555555", linestyle="--", marker="s",
+               markersize=4, label="Planning"),
+    ]
+    if engine_handles:
+        # Upper-right: the empty quadrant (CedarDB/MonetDB stop at J128, only
+        # DuckDB runs on), so the legend never hides the sparse MonetDB points.
+        leg_engines = ax.legend(engine_handles, engine_names, loc="upper right",
+                                fontsize=8, framealpha=0.9)
+        ax.add_artist(leg_engines)
+    ax.legend(handles=style_handles, loc="lower right", fontsize=8,
+              framealpha=0.9)
+    # Headroom at the top so the upper-left engine legend clears the topmost
+    # lines (esp. MonetDB's sparse SF100 point, which otherwise hides behind it).
+    ax.set_ylim(top=ax.get_ylim()[1] * 4)
+
+    # SF100 MonetDB join is the known config artifact — show it, but say so.
+    if "monetdb" in engines and "sf100" in str(output_dir).lower():
+        fig.text(0.5, -0.01,
+                 "MonetDB join @ SF100 is a config artifact (112 SMT threads, no "
+                 "ANALYZE); rerun pending (OE-8) — see join_sf100_prior for "
+                 "protocol-faithful numbers.",
+                 ha="center", va="top", fontsize=5.5, style="italic", color="#777777")
+    fig.tight_layout()
+    save_fig(fig, output_dir, "fig11_join_exec_planning.png")
 
 
 # ── E3 Plot (Fig 12) ───────────────────────────────────────────
@@ -519,7 +600,7 @@ def plot_fig12(e3_data: Dict[str, List[Dict[str, Any]]], output_dir: Path) -> No
     if not engines:
         return
 
-    fig, ax = plt.subplots(figsize=(6, 4))
+    fig, ax = plt.subplots(figsize=(6, 3.3))
     plotted = False
 
     for eng in engines:
@@ -527,7 +608,7 @@ def plot_fig12(e3_data: Dict[str, List[Dict[str, Any]]], output_dir: Path) -> No
             e3_data[eng], _extract_union_level, "wall_time_ms_total")
         if not levels:
             continue
-        ax.plot(levels, meds, "o-", label=engine_label(eng),
+        ax.plot(levels, [m / 1000.0 for m in meds], "o-", label=engine_label(eng),
                 color=engine_color(eng), linewidth=1.8, markersize=5)
         plotted = True
 
@@ -538,7 +619,7 @@ def plot_fig12(e3_data: Dict[str, List[Dict[str, Any]]], output_dir: Path) -> No
     ax.set_xscale("log", base=2)
     ax.set_yscale("log")
     ax.set_xlabel("UNION ALL fan-in level")
-    ax.set_ylabel("Median end-to-end runtime (ms)")
+    ax.set_ylabel("Median end-to-end runtime (s)")
     ax.set_title("UNION ALL scaling")
     ax.legend()
     ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
@@ -623,12 +704,12 @@ def plot_fig13(e4_records: List[Dict[str, Any]], output_dir: Path) -> None:
         p75.append(float(np.percentile(vals, 75)))
         p90.append(float(np.percentile(vals, 90)))
 
-    fig, ax = plt.subplots(figsize=(7, 4.5))
+    fig, ax = plt.subplots(figsize=(7, 3.7))
     levels_arr = np.array(levels)
 
-    ax.fill_between(levels_arr, p10, p90, alpha=0.15, color="#FF6B00", label="P10\u2013P90")
-    ax.fill_between(levels_arr, p25, p75, alpha=0.30, color="#FF6B00", label="P25\u2013P75")
-    ax.plot(levels_arr, p50, "o-", color="#FF6B00", linewidth=2, markersize=5, label="Median")
+    ax.fill_between(levels_arr, p10, p90, alpha=0.15, color="#58b4dd", label="P10\u2013P90")
+    ax.fill_between(levels_arr, p25, p75, alpha=0.30, color="#58b4dd", label="P25\u2013P75")
+    ax.plot(levels_arr, p50, "o-", color="#58b4dd", linewidth=2, markersize=5, label="Median")
 
     ax.axhline(1.0, color="#999999", linestyle="--", linewidth=0.8)
     ax.set_xlabel("Stringification level (STR)")
@@ -795,7 +876,7 @@ def main() -> None:
         e2_data = _collect_e2(e2_dir)
         if e2_data:
             plot_fig11(e2_data, output_dir)
-            generated += 2
+            generated += 1
     else:
         print("E2: skipped (directory not found)")
 
