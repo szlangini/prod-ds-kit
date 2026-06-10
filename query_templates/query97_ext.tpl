@@ -34,7 +34,7 @@
 -- 
 
 define DMS = random(1176,1224, uniform);
-define _LIMIT=1000000001;
+define _LIMIT=5000000;
 with ssci as (
 select /*KEEP_LIMIT*/ top 10 ss_customer_sk customer_sk
       ,ss_item_sk item_sk

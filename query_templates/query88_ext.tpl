@@ -34,7 +34,7 @@
 -- 
  define HOUR = ulist(random(-1,4,uniform),3);
  define STORE = dist(stores,1,1);
- define _LIMIT=100;
+ define _LIMIT=50000;
 [_LIMITA] select [_LIMITB] *
 from
  (select count(*) h8_30_to_9

@@ -33,7 +33,7 @@
 -- Contributors:
 -- 
 define DMS = random(1176,1224,uniform); 
-define _LIMIT=50000000;
+define _LIMIT=50000;
 
 [_LIMITA] select [_LIMITB] count(*) from (
     select distinct c_last_name, c_first_name, d_date

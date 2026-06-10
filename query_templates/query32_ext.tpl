@@ -35,7 +35,7 @@
 define IMID  = random(1,1000,uniform); 
 define YEAR  = random(1998,2002,uniform);
 define CSDATE = date([YEAR]+"-01-01",[YEAR]+"-04-01",sales);
-define _LIMIT=5000000;
+define _LIMIT=50000;
 
 [_LIMITA] select [_LIMITB] sum(cs_ext_discount_amt)  as "excess discount amount" 
 from 
