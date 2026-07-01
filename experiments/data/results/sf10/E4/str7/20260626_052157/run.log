@@ -1,0 +1,4 @@
+2026-06-26 05:21:57,511 WARNING cgroup v2 detected but not writable; falling back to ulimit for memory limits.
+2026-06-26 05:21:57,522 INFO Loading data for duckdb...
+2026-06-26 05:21:57,539 INFO Warmup: 1 queries for prodds
+2026-06-26 05:32:10,195 INFO Results written to /home/jvs34/prod-ds-cleanup/.reproduce/sf10/results/E4/str7/20260626_052157

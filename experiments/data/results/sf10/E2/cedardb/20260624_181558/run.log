@@ -1,0 +1,6 @@
+2026-06-24 18:15:58,880 WARNING cgroup v2 detected but not writable; falling back to ulimit for memory limits.
+2026-06-24 18:15:58,892 INFO No postgres start_command provided; assuming server already running.
+2026-06-24 18:15:58,954 WARNING CedarDB SET options failed (continuing): ERROR:  cannot change configuration parameter "max_parallel_workers_per_gather"
+2026-06-24 18:15:58,955 INFO Loading data for cedardb...
+2026-06-24 18:15:58,993 INFO Warmup: 1 queries for prodds
+2026-06-24 20:52:07,118 INFO Results written to /home/jvs34/prod-ds-cleanup/.reproduce/sf10/results/E2/cedardb/20260624_181558

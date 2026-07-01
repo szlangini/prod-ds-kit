@@ -1,0 +1,10 @@
+engine,query_name,median_s,mean_s,stddev_s,n_success
+cedardb,query_join_J100.sql,942.630400,946.595385,18.397326,10
+cedardb,query_join_J200.sql,1139.160706,1139.846149,23.414062,10
+cedardb,query_join_J50.sql,813.452205,815.147077,11.215436,10
+duckdb,query_join_J100.sql,562.922641,560.737834,8.903671,10
+duckdb,query_join_J200.sql,784.627384,773.962333,22.510191,10
+duckdb,query_join_J50.sql,478.770503,477.562659,6.075933,10
+monetdb,query_join_J100.sql,120.943399,121.291747,2.398707,10
+monetdb,query_join_J200.sql,198.131275,198.869299,2.092997,10
+monetdb,query_join_J50.sql,99.632430,99.257864,1.683459,10

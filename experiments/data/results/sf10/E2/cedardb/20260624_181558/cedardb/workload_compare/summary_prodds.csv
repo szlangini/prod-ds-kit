@@ -1,0 +1,9 @@
+query_id,suite,experiment_name,join_count,string_level,seed,runs_total,runs_success,runs_failed,failure_rate,median_ms,min_ms,max_ms,median_planning_ms,median_execution_ms
+query_join_J16,prodds,workload_compare,,,,10,10,0,0.0,79297.5,78193,81413,40.0,79257.5
+query_join_J32,prodds,workload_compare,,,,10,10,0,0.0,82445.5,81478,84605,43.5,82402.0
+query_join_J64,prodds,workload_compare,,,,10,10,0,0.0,95998.0,94248,97332,51.5,95949.0
+query_join_J128,prodds,workload_compare,,,,10,10,0,0.0,112299.5,107529,114897,69.0,112229.5
+query_join_J256,prodds,workload_compare,,,,10,10,0,0.0,143444.0,139289,145676,93.5,143348.5
+query_join_J512,prodds,workload_compare,,,,10,10,0,0.0,135554.5,133235,138368,148.0,135415.0
+query_join_J1024,prodds,workload_compare,,,,10,10,0,0.0,126273.5,120597,131480,289.0,125990.5
+query_join_J2048,prodds,workload_compare,,,,10,10,0,0.0,149958.0,141518,154082,747.5,149200.0

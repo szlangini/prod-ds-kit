@@ -1,0 +1,15 @@
+2026-06-26 10:09:56,770 WARNING cgroup v2 detected but not writable; falling back to ulimit for memory limits.
+2026-06-26 10:09:56,781 INFO No postgres start_command provided; assuming server already running.
+2026-06-26 10:09:56,842 WARNING CedarDB SET options failed (continuing): ERROR:  cannot change configuration parameter "max_parallel_workers_per_gather"
+2026-06-26 10:09:56,842 INFO Loading data for cedardb...
+2026-06-26 10:09:56,902 INFO Warmup: 1 queries for prodds
+2026-06-26 10:12:06,949 INFO query_16: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 10:12:09,330 INFO query_19: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 10:14:51,806 INFO query_29: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 10:14:57,514 INFO query_34: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 10:41:25,395 INFO query_72: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 10:42:06,388 INFO query_90: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 10:42:13,670 INFO query_96: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 13:21:04,830 INFO query_union_U1000: oom on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 13:21:04,940 INFO query_union_U2048: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 13:21:04,947 INFO Results written to /home/jvs34/prod-ds-cleanup/.reproduce/sf10/results/E4X/cedardb_str1/20260626_100956

@@ -1,0 +1,11 @@
+2026-06-24 14:42:33,335 WARNING cgroup v2 detected but not writable; falling back to ulimit for memory limits.
+2026-06-24 14:42:33,361 INFO Loading data for monetdb...
+2026-06-24 14:42:33,389 INFO Warmup: 1 queries for prodds
+2026-06-24 14:49:59,309 INFO query_19: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-24 14:52:42,767 INFO query_24: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-24 14:56:17,362 INFO query_39: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-24 15:43:33,461 INFO query_join_J50: timeout_execution on rep 8 — skipping remaining 2 reps (early abandon).
+2026-06-24 15:45:35,845 INFO query_60: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-24 15:50:50,155 INFO query_94: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-24 16:28:22,284 INFO query_join_J100: timeout_execution on rep 6 — skipping remaining 4 reps (early abandon).
+2026-06-24 17:52:19,523 INFO Results written to /home/jvs34/prod-ds-cleanup/.reproduce/sf10/results/E1/monetdb_prodds/20260624_144233

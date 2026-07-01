@@ -1,0 +1,41 @@
+# Keep the build context small and the image hermetic. Patterns must stand
+# alone (Docker does NOT support trailing inline comments). Leading "/" anchors
+# to the context root so we don't accidentally exclude experiments/data or
+# experiments/queries (both tracked and needed in the image).
+
+# Huge / machine-local (regenerated at runtime by reproduce.sh --init)
+.reproduce
+.git
+.venv
+venv
+eab_artifact
+
+# Re-cloned at a pinned commit by install.sh
+tpcds-kit
+
+# Force install.sh to re-verify inside the image
+.install_complete
+workload/dsdgen/stringify_cpp
+
+# Generated, root-level only (anchored so experiments/data + experiments/queries survive)
+/data
+/data_utf8
+/output
+/snowflake_run
+/queries
+experiments/plan_runs
+
+# Generated schema (regenerate from the pinned tpcds-kit inside the image so the
+# base + prod schemas stay consistent — a stale host copy desyncs the rewrite)
+/tools/tpcds.sql
+/tools/prodds.sql
+
+# Caches / noise
+**/__pycache__
+*.pyc
+*.egg-info
+.pytest_cache
+*.bak
+.vscode
+.idea
+.DS_Store

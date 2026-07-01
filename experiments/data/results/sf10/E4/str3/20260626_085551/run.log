@@ -1,0 +1,3 @@
+2026-06-26 08:55:51,665 WARNING cgroup v2 detected but not writable; falling back to ulimit for memory limits.
+2026-06-26 08:55:51,676 INFO Loading data for duckdb...
+2026-06-26 08:55:51,692 INFO Warmup: 1 queries for prodds

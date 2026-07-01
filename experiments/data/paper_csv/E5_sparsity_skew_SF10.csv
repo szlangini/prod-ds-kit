@@ -1,0 +1,10 @@
+variant,tier,engine,delta_pct,se_pct,n_common
+sparsity,medium,duckdb,-1.2,0.5,104
+sparsity,medium,cedardb,-1.6,0.6,96
+sparsity,medium,monetdb,-1.3,0.5,99
+skew,medium,duckdb,-1.2,0.2,104
+skew,medium,cedardb,-0.8,0.5,96
+skew,medium,monetdb,+0.9,0.7,99
+combined,medium,duckdb,-2.4,0.4,104
+combined,medium,cedardb,-1.6,0.5,96
+combined,medium,monetdb,-1.4,0.6,99

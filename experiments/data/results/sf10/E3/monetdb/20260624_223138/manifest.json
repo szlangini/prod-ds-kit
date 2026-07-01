@@ -1,0 +1,59 @@
+{
+  "config": {
+    "engines": {
+      "monetdb": {
+        "enabled": true,
+        "load_command": "echo 'Data pre-loaded.'",
+        "native": {
+          "dbname": "prodds_sf10_str5",
+          "host": "localhost",
+          "mclient_path": "mclient",
+          "password": "monetdb",
+          "port": 50000,
+          "user": "monetdb"
+        }
+      }
+    },
+    "experiments": {
+      "workload_compare": {
+        "prodds_dir": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/queries/monetdb/union_scaling",
+        "tpcds_dir": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/configs/empty_queries"
+      }
+    },
+    "global": {
+      "execution_mode": "native",
+      "log_level": "INFO",
+      "memory_limit_bytes": 865409001062,
+      "planning_enabled": true,
+      "repetitions": 10,
+      "results_dir": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/results/E3/monetdb",
+      "threads": 56,
+      "timeout_seconds_execution": 1800,
+      "timeout_seconds_planning": 300,
+      "warmup_queries": 1
+    },
+    "validation": {
+      "enabled": false
+    }
+  },
+  "git_hashes": {
+    "harness": "3b18a041ce26d8c824afaef7af1f2a0a82cbd5c6",
+    "join_generator": null,
+    "string_generator": null
+  },
+  "host": {
+    "cpu_count_logical": 112,
+    "cpu_count_physical": 56,
+    "cpu_model": "AMD EPYC 7453 28-Core Processor",
+    "machine": "x86_64",
+    "memory_total_bytes": 1081761251328,
+    "os": "Linux",
+    "os_release": "6.17.0-23-generic",
+    "os_version": "#23~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue Apr 14 16:11:48 UTC 2",
+    "python": "3.12.3"
+  },
+  "systems": {
+    "monetdb": "MonetDB 5 server 11.55.7 (Dec2025-SP3) (64-bit, 128-bit integers)"
+  },
+  "timestamp": "20260624_223138"
+}

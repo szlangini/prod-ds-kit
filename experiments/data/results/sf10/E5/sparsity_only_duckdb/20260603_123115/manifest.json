@@ -1,0 +1,55 @@
+{
+  "config": {
+    "engines": {
+      "duckdb": {
+        "database_path": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/databases/duckdb/sparsity_sf10_sparsity_only.duckdb",
+        "enabled": true,
+        "load_command": "echo 'Data pre-loaded.'",
+        "native": {
+          "cli_path": "/home/jvs34/prod-ds-cleanup/.reproduce/engines/duckdb/duckdb"
+        }
+      }
+    },
+    "experiments": {
+      "workload_compare": {
+        "prodds_dir": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/queries/duckdb/prodds",
+        "tpcds_dir": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/configs/empty_queries"
+      }
+    },
+    "global": {
+      "execution_mode": "native",
+      "log_level": "INFO",
+      "memory_limit_bytes": 865409001062,
+      "planning_enabled": true,
+      "repetitions": 10,
+      "results_dir": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/results/E5/sparsity_only_duckdb",
+      "threads": 56,
+      "timeout_seconds_execution": 1800,
+      "timeout_seconds_planning": 300,
+      "warmup_queries": 1
+    },
+    "validation": {
+      "enabled": false
+    }
+  },
+  "git_hashes": {
+    "harness": "3644fe2372c4b8b29a19ac05b02b636015a6c7a9",
+    "join_generator": null,
+    "string_generator": null
+  },
+  "host": {
+    "cpu_count_logical": 112,
+    "cpu_count_physical": 56,
+    "cpu_model": "AMD EPYC 7453 28-Core Processor",
+    "machine": "x86_64",
+    "memory_total_bytes": 1081761251328,
+    "os": "Linux",
+    "os_release": "6.17.0-23-generic",
+    "os_version": "#23~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue Apr 14 16:11:48 UTC 2",
+    "python": "3.12.3"
+  },
+  "systems": {
+    "duckdb": "v1.4.4 (Andium) 6ddac802ff"
+  },
+  "timestamp": "20260603_123115"
+}

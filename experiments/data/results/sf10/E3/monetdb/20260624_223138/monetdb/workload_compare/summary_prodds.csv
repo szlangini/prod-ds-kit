@@ -1,0 +1,6 @@
+query_id,suite,experiment_name,join_count,string_level,seed,runs_total,runs_success,runs_failed,failure_rate,median_ms,min_ms,max_ms,median_planning_ms,median_execution_ms
+query_union_U2,prodds,workload_compare,,,,10,10,0,0.0,1016.0,989,1042,19.0,998.5
+query_union_U5,prodds,workload_compare,,,,10,10,0,0.0,2526.5,2443,2602,19.0,2506.5
+query_union_U10,prodds,workload_compare,,,,10,10,0,0.0,6949.0,6744,7180,20.0,6929.5
+query_union_U20,prodds,workload_compare,,,,10,10,0,0.0,15350.5,14681,16671,21.5,15330.0
+query_union_U200,prodds,workload_compare,,,,10,10,0,0.0,291037.0,287907,299009,52.0,290985.5

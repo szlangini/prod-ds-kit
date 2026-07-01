@@ -1,0 +1,5 @@
+engine,SUCCESS,TIMEOUT,PARSE,DIALECT,FAILURE,total
+duckdb,98,0,0,0,1,99
+postgres,86,12,0,0,1,99
+cedardb,90,0,0,8,1,99
+monetdb,75,0,18,5,1,99

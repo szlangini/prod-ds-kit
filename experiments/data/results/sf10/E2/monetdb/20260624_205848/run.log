@@ -1,0 +1,12 @@
+2026-06-24 20:58:48,728 WARNING cgroup v2 detected but not writable; falling back to ulimit for memory limits.
+2026-06-24 20:58:48,754 INFO Loading data for monetdb...
+2026-06-24 20:58:48,780 INFO Warmup: 1 queries for prodds
+2026-06-24 21:34:18,195 INFO query_join_J16: timeout_execution on rep 6 — skipping remaining 4 reps (early abandon).
+2026-06-24 21:34:18,196 INFO query_join_J32: skipped (ladder abandon — a level >= 16 already failed).
+2026-06-24 21:34:18,196 INFO query_join_J64: skipped (ladder abandon — a level >= 16 already failed).
+2026-06-24 21:34:18,196 INFO query_join_J128: skipped (ladder abandon — a level >= 16 already failed).
+2026-06-24 21:34:18,196 INFO query_join_J256: skipped (ladder abandon — a level >= 16 already failed).
+2026-06-24 21:34:18,196 INFO query_join_J512: skipped (ladder abandon — a level >= 16 already failed).
+2026-06-24 21:34:18,197 INFO query_join_J1024: skipped (ladder abandon — a level >= 16 already failed).
+2026-06-24 21:34:18,197 INFO query_join_J2048: skipped (ladder abandon — a level >= 16 already failed).
+2026-06-24 21:34:18,199 INFO Results written to /home/jvs34/prod-ds-cleanup/.reproduce/sf10/results/E2/monetdb/20260624_205848

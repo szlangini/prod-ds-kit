@@ -1,0 +1,41 @@
+2026-06-26 19:32:46,364 WARNING cgroup v2 detected but not writable; falling back to ulimit for memory limits.
+2026-06-26 19:32:46,391 INFO Loading data for monetdb...
+2026-06-26 19:32:46,446 INFO Warmup: 1 queries for prodds
+2026-06-26 19:32:51,070 INFO query_union_U2: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:32:51,096 INFO query_3: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:34:03,032 INFO query_union_U5: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:34:03,064 INFO query_6: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:34:03,093 INFO query_7: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:35:57,128 INFO query_union_U10: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:36:01,058 INFO query_14: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:36:08,281 INFO query_17: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:36:37,222 INFO query_union_U20: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:36:42,608 INFO query_24: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:36:42,636 INFO query_25: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:36:59,688 INFO query_31: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:36:59,713 INFO query_32: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:39:30,245 INFO query_38: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:39:30,274 INFO query_39: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:39:49,717 INFO query_43: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:39:49,741 INFO query_44: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:56:51,246 INFO query_union_U50: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:56:51,276 INFO query_51: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:58:44,355 INFO query_60: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:58:47,310 INFO query_64: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:58:47,339 INFO query_65: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 19:58:48,379 INFO query_67: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 20:01:26,630 INFO query_76: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 20:01:41,612 INFO query_78: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 20:02:02,935 INFO query_86: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 20:02:03,110 INFO query_87: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 20:02:16,978 INFO query_93: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 20:02:17,081 INFO query_94: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 20:02:23,370 INFO query_98: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 20:32:27,232 INFO query_join_J100: timeout_execution on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 20:32:28,330 INFO query_union_U100: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 21:20:49,838 INFO query_join_J200: timeout_execution on rep 6 — skipping remaining 4 reps (early abandon).
+2026-06-26 21:20:51,639 INFO query_union_U200: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 21:20:52,334 INFO query_union_U500: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 21:20:53,315 INFO query_union_U1000: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 21:20:55,458 INFO query_union_U2048: error on rep 1 — skipping remaining 9 reps (early abandon).
+2026-06-26 21:20:55,470 INFO Results written to /home/jvs34/prod-ds-cleanup/.reproduce/sf10/results/E4X/monetdb_str4/20260626_193246

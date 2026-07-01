@@ -1,0 +1,4 @@
+2026-06-24 22:31:38,129 WARNING cgroup v2 detected but not writable; falling back to ulimit for memory limits.
+2026-06-24 22:31:38,157 INFO Loading data for monetdb...
+2026-06-24 22:31:38,184 INFO Warmup: 1 queries for prodds
+2026-06-24 23:24:48,252 INFO Results written to /home/jvs34/prod-ds-cleanup/.reproduce/sf10/results/E3/monetdb/20260624_223138
