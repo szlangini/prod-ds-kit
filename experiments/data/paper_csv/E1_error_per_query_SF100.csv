@@ -1,0 +1,19 @@
+engine,query,category,cause
+cedardb,query_16,DIALECT,COUNT(DISTINCT) in GROUPING SETS unsupported
+cedardb,query_34,DIALECT,COUNT(DISTINCT) in GROUPING SETS unsupported
+cedardb,query_90,DIALECT,COUNT(DISTINCT) in GROUPING SETS unsupported
+cedardb,query_19,DIALECT,nested aggregate in subquery not allowed
+cedardb,query_29,DIALECT,nested aggregate in subquery not allowed
+cedardb,query_72,DIALECT,nested aggregate in subquery not allowed
+cedardb,query_96,DIALECT,nested aggregate in subquery not allowed
+cedardb,query_78,FAILURE,stringification-induced int/varchar type mismatch
+cedardb,query_union_U200,OOM,internal cell-count ceiling (949407386) exceeded
+monetdb,query_24,DIALECT,stringification-induced: no operator sql_sub(varchar,varchar)
+monetdb,query_60,DIALECT,stringification-induced: no operator sql_sub(varchar,varchar)
+monetdb,query_94,DIALECT,stringification-induced: no operator sql_sub(varchar,varchar)
+monetdb,query_39,DIALECT,non-GROUP-BY column without aggregate (stricter)
+monetdb,query_19,FAILURE,GDK mergejoin: more than one match
+monetdb,query_join_J50,TIMEOUT,amplification query exceeds 1800s
+monetdb,query_join_J100,TIMEOUT,amplification query exceeds 1800s
+monetdb,query_join_J200,TIMEOUT,amplification query exceeds 1800s
+monetdb,query_union_U200,TIMEOUT,amplification query exceeds 1800s

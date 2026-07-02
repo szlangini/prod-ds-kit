@@ -1,0 +1,246 @@
+# Shipped tiers (referenced in the paper):
+#   NULL: null_low, fleet_realworld_final (medium/default), null_high
+#   MCV:  mcv_low, mcv_fleet_default (medium/default), mcv_high
+# Legacy profiles below are preserved for historical reference.
+
+profiles:
+  mcv_fleet_default:
+    # Full eligible coverage; the per-column target (max_value_buckets) decides how
+    # much each column is skewed, so coverage no longer needs to be throttled here.
+    column_selection_fraction: 1.0
+    selection_fraction_scope: overall
+    exclude_tables:
+      - date_dim
+      - time_dim
+    exclude_qualified_columns:
+      - item.i_category
+      - item.i_class
+      - item.i_brand
+      - item.i_color
+      - item.i_size
+      - item.i_units
+      - item.i_current_price
+      - store.s_state
+      - store.s_city
+      - store.s_zip
+      - store.s_county
+      - customer_address.ca_state
+      - customer_address.ca_city
+      - customer_address.ca_zip
+      - customer_address.ca_county
+      - customer_address.ca_country
+      - customer_address.ca_gmt_offset
+      - customer_demographics.cd_marital_status
+      - customer_demographics.cd_education_status
+      - customer_demographics.cd_gender
+      - customer_demographics.cd_credit_rating
+      - customer.c_preferred_cust_flag
+      - customer.c_birth_country
+      - household_demographics.hd_buy_potential
+      - income_band.ib_lower_bound
+      - income_band.ib_upper_bound
+      - inventory.inv_quantity_on_hand
+      - promotion.p_channel_dmail
+      - promotion.p_channel_email
+      - promotion.p_channel_tv
+      - promotion.p_channel_radio
+      - promotion.p_channel_press
+      - promotion.p_channel_event
+      - promotion.p_channel_demo
+      - ship_mode.sm_carrier
+      - reason.r_reason_desc
+      - store_sales.ss_ext_list_price
+      - store_sales.ss_ext_wholesale_cost
+      - store_sales.ss_ext_discount_amt
+      - store_sales.ss_ext_sales_price
+      - catalog_sales.cs_ext_list_price
+      - catalog_sales.cs_ext_wholesale_cost
+      - catalog_sales.cs_ext_discount_amt
+      - catalog_sales.cs_ext_sales_price
+      - web_sales.ws_sales_price
+      - web_sales.ws_net_profit
+      - web_sales.ws_ext_list_price
+      - web_sales.ws_ext_wholesale_cost
+      - web_sales.ws_ext_discount_amt
+      - web_sales.ws_ext_sales_price
+    # Target distribution of the TOP-1 (max-value) share -- the fraction of total
+    # rows the single most-common value occupies. This is exactly what the Redshift
+    # "Maximum MCV frequency" curve measures. Calibrated 2026-06 to the fleet mid-tail
+    # (>=0.30~49, >=0.50~41) while staying deliberately conservative at the extreme
+    # (>=0.70/>=0.90 above the TPC-DS base but well below the fleet, per paper 5.2.6).
+    # Injection reuses each column's natural dominant value and is null-compensated +
+    # monotonic, so these are realized targets over total rows -- not raw cell rates.
+    max_value_buckets:
+      - weight: 0.03
+        min: 0.01
+        max: 0.10
+      - weight: 0.05
+        min: 0.10
+        max: 0.30
+      - weight: 0.12
+        min: 0.30
+        max: 0.50
+      - weight: 0.35
+        min: 0.50
+        max: 0.70
+      - weight: 0.25
+        min: 0.70
+        max: 0.90
+      - weight: 0.20
+        min: 0.90
+        max: 0.99
+
+  mcv_low:
+    column_selection_fraction: 0.45
+    selection_fraction_scope: overall
+    exclude_tables:
+      - date_dim
+      - time_dim
+    exclude_qualified_columns:
+      - item.i_category
+      - item.i_class
+      - item.i_brand
+      - item.i_color
+      - item.i_size
+      - item.i_units
+      - item.i_current_price
+      - store.s_state
+      - store.s_city
+      - store.s_zip
+      - store.s_county
+      - customer_address.ca_state
+      - customer_address.ca_city
+      - customer_address.ca_zip
+      - customer_address.ca_county
+      - customer_address.ca_country
+      - customer_address.ca_gmt_offset
+      - customer_demographics.cd_marital_status
+      - customer_demographics.cd_education_status
+      - customer_demographics.cd_gender
+      - customer_demographics.cd_credit_rating
+      - customer.c_preferred_cust_flag
+      - customer.c_birth_country
+      - household_demographics.hd_buy_potential
+      - income_band.ib_lower_bound
+      - income_band.ib_upper_bound
+      - inventory.inv_quantity_on_hand
+      - promotion.p_channel_dmail
+      - promotion.p_channel_email
+      - promotion.p_channel_tv
+      - promotion.p_channel_radio
+      - promotion.p_channel_press
+      - promotion.p_channel_event
+      - promotion.p_channel_demo
+      - ship_mode.sm_carrier
+      - reason.r_reason_desc
+      - store_sales.ss_ext_list_price
+      - store_sales.ss_ext_wholesale_cost
+      - store_sales.ss_ext_discount_amt
+      - store_sales.ss_ext_sales_price
+      - catalog_sales.cs_ext_list_price
+      - catalog_sales.cs_ext_wholesale_cost
+      - catalog_sales.cs_ext_discount_amt
+      - catalog_sales.cs_ext_sales_price
+      - web_sales.ws_sales_price
+      - web_sales.ws_net_profit
+      - web_sales.ws_ext_list_price
+      - web_sales.ws_ext_wholesale_cost
+      - web_sales.ws_ext_discount_amt
+      - web_sales.ws_ext_sales_price
+    # Low-skew tier: most mass in the mild [0.01, 0.30] range, little above 0.5.
+    max_value_buckets:
+      - weight: 0.30
+        min: 0.01
+        max: 0.10
+      - weight: 0.30
+        min: 0.10
+        max: 0.30
+      - weight: 0.25
+        min: 0.30
+        max: 0.50
+      - weight: 0.12
+        min: 0.50
+        max: 0.70
+      - weight: 0.03
+        min: 0.70
+        max: 0.85
+
+  mcv_high:
+    column_selection_fraction: 1.0
+    selection_fraction_scope: overall
+    exclude_tables:
+      - date_dim
+      - time_dim
+    exclude_qualified_columns:
+      - item.i_category
+      - item.i_class
+      - item.i_brand
+      - item.i_color
+      - item.i_size
+      - item.i_units
+      - item.i_current_price
+      - store.s_state
+      - store.s_city
+      - store.s_zip
+      - store.s_county
+      - customer_address.ca_state
+      - customer_address.ca_city
+      - customer_address.ca_zip
+      - customer_address.ca_county
+      - customer_address.ca_country
+      - customer_address.ca_gmt_offset
+      - customer_demographics.cd_marital_status
+      - customer_demographics.cd_education_status
+      - customer_demographics.cd_gender
+      - customer_demographics.cd_credit_rating
+      - customer.c_preferred_cust_flag
+      - customer.c_birth_country
+      - household_demographics.hd_buy_potential
+      - income_band.ib_lower_bound
+      - income_band.ib_upper_bound
+      - inventory.inv_quantity_on_hand
+      - promotion.p_channel_dmail
+      - promotion.p_channel_email
+      - promotion.p_channel_tv
+      - promotion.p_channel_radio
+      - promotion.p_channel_press
+      - promotion.p_channel_event
+      - promotion.p_channel_demo
+      - ship_mode.sm_carrier
+      - reason.r_reason_desc
+      - store_sales.ss_ext_list_price
+      - store_sales.ss_ext_wholesale_cost
+      - store_sales.ss_ext_discount_amt
+      - store_sales.ss_ext_sales_price
+      - catalog_sales.cs_ext_list_price
+      - catalog_sales.cs_ext_wholesale_cost
+      - catalog_sales.cs_ext_discount_amt
+      - catalog_sales.cs_ext_sales_price
+      - web_sales.ws_sales_price
+      - web_sales.ws_net_profit
+      - web_sales.ws_ext_list_price
+      - web_sales.ws_ext_wholesale_cost
+      - web_sales.ws_ext_discount_amt
+      - web_sales.ws_ext_sales_price
+    # High-skew tier: heavy mass at/above 0.5 and a real extreme tail toward the
+    # production curve (>=0.90 ~ fleet). Use with care -- aggressive max-value
+    # dominance can collapse predicate selectivity (see paper 5.2.6).
+    max_value_buckets:
+      - weight: 0.01
+        min: 0.01
+        max: 0.10
+      - weight: 0.03
+        min: 0.10
+        max: 0.30
+      - weight: 0.06
+        min: 0.30
+        max: 0.50
+      - weight: 0.25
+        min: 0.50
+        max: 0.70
+      - weight: 0.30
+        min: 0.70
+        max: 0.90
+      - weight: 0.35
+        min: 0.90
+        max: 0.99
