@@ -47,16 +47,29 @@ struct MCVRule {
   std::vector<std::string> values;
 };
 
+struct KeySkewRule {
+  int index = -1;
+  int identity_index = -1;
+  std::string channel;
+  std::string domain;
+  double f1 = 0.0;
+  std::string value;
+  bool entity = false;  // "granularity": entity -> hash the key value, not the ticket
+};
+
 struct RuleSet {
   bool stringify_enabled = false;
   bool nulls_enabled = false;
   bool mcv_enabled = false;
-  int null_seed = 0;
-  int mcv_seed = 0;
+  bool key_skew_enabled = false;
+  long long null_seed = 0;
+  long long mcv_seed = 0;
+  long long key_skew_seed = 0;
   std::string null_marker;
   std::unordered_map<std::string, std::vector<StringifyRule>> stringify_rules;
   std::unordered_map<std::string, std::vector<NullRule>> null_rules;
   std::unordered_map<std::string, std::vector<MCVRule>> mcv_rules;
+  std::unordered_map<std::string, std::vector<KeySkewRule>> key_skew_rules;
 };
 
 struct RewriteTask {
@@ -73,6 +86,7 @@ struct RewriteStats {
   uint64_t files_rewritten = 0;
   uint64_t rows_rewritten = 0;
   double duration_s = 0.0;
+  bool key_skew_applied = false;
 };
 
 static void print_usage(const char* prog) {
@@ -267,7 +281,7 @@ static RuleSet load_rules(const std::string& path) {
   const YAML::Node nulls = root["nulls"];
   if (nulls) {
     rules.nulls_enabled = nulls["enabled"] ? nulls["enabled"].as<bool>() : false;
-    rules.null_seed = nulls["seed"] ? nulls["seed"].as<int>() : 0;
+    rules.null_seed = nulls["seed"] ? nulls["seed"].as<long long>() : 0;
     rules.null_marker =
         nulls["null_marker"] ? nulls["null_marker"].as<std::string>() : "";
     const YAML::Node map = nulls["rules"];
@@ -292,7 +306,7 @@ static RuleSet load_rules(const std::string& path) {
   const YAML::Node mcv = root["mcv"];
   if (mcv) {
     rules.mcv_enabled = mcv["enabled"] ? mcv["enabled"].as<bool>() : false;
-    rules.mcv_seed = mcv["seed"] ? mcv["seed"].as<int>() : 0;
+    rules.mcv_seed = mcv["seed"] ? mcv["seed"].as<long long>() : 0;
     if (rules.null_marker.empty() && mcv["null_marker"]) {
       rules.null_marker = mcv["null_marker"].as<std::string>();
     }
@@ -323,6 +337,35 @@ static RuleSet load_rules(const std::string& path) {
     }
   }
 
+  const YAML::Node key_skew = root["key_skew"];
+  if (key_skew) {
+    rules.key_skew_enabled =
+        key_skew["enabled"] ? key_skew["enabled"].as<bool>() : false;
+    rules.key_skew_seed = key_skew["seed"] ? key_skew["seed"].as<long long>() : 0;
+    const YAML::Node map = key_skew["rules"];
+    if (map) {
+      for (auto it = map.begin(); it != map.end(); ++it) {
+        const std::string table = it->first.as<std::string>();
+        const YAML::Node list = it->second;
+        std::vector<KeySkewRule> vec;
+        vec.reserve(list.size());
+        for (const auto& item : list) {
+          KeySkewRule rule;
+          rule.index = item["index"].as<int>();
+          rule.identity_index = item["identity_index"].as<int>();
+          rule.channel = item["channel"] ? item["channel"].as<std::string>() : "";
+          rule.domain = item["domain"] ? item["domain"].as<std::string>() : "";
+          rule.f1 = item["f1"].as<double>();
+          rule.value = item["value"] ? item["value"].as<std::string>() : "";
+          rule.entity = item["granularity"] &&
+                        item["granularity"].as<std::string>() == "entity";
+          vec.push_back(std::move(rule));
+        }
+        rules.key_skew_rules[table] = std::move(vec);
+      }
+    }
+  }
+
   return rules;
 }
 
@@ -346,6 +389,44 @@ static void apply_nulls(
         seed, {table, rule.name, token, row_index_token});
     if (h < rule.probability) {
       row[rule.index] = null_marker;
+    }
+  }
+}
+
+static void apply_key_skew(
+    std::vector<std::string>& row,
+    const std::vector<KeySkewRule>& rules,
+    const std::string& seed,
+    const std::string& null_marker) {
+  for (const KeySkewRule& rule : rules) {
+    if (rule.index < 0 || static_cast<size_t>(rule.index) >= row.size()) {
+      continue;
+    }
+    const std::string& current = row[rule.index];
+    if (current.empty() || current == null_marker || current == "\\N") {
+      continue;
+    }
+    double h = 0.0;
+    if (rule.entity) {
+      // Entity granularity: hash the key VALUE (no channel, no ticket) so an
+      // entity is redirected in every row of every channel or keeps its whole
+      // history (matches KeySkewInjector.apply_to_row in stringify.py).
+      h = stable_unit_hash(seed, {"key-skew-entity", rule.domain, current});
+    } else {
+      if (rule.identity_index < 0 ||
+          static_cast<size_t>(rule.identity_index) >= row.size()) {
+        continue;
+      }
+      const std::string& identity = row[rule.identity_index];
+      if (identity.empty() || identity == null_marker || identity == "\\N") {
+        continue;
+      }
+      // Decision depends ONLY on (channel, domain, identity) so mirror columns
+      // in sales and returns files reach the identical decision independently.
+      h = stable_unit_hash(seed, {"key-skew", rule.channel, rule.domain, identity});
+    }
+    if (h < rule.f1) {
+      row[rule.index] = rule.value;
     }
   }
 }
@@ -427,7 +508,9 @@ static FileResult process_file(
   const bool has_nulls =
       rules.nulls_enabled && rules.null_rules.count(table) > 0;
   const bool has_mcv = rules.mcv_enabled && rules.mcv_rules.count(table) > 0;
-  if (!has_stringify && !has_nulls && !has_mcv) {
+  const bool has_key_skew =
+      rules.key_skew_enabled && rules.key_skew_rules.count(table) > 0;
+  if (!has_stringify && !has_nulls && !has_mcv && !has_key_skew) {
     return FileResult{};
   }
 
@@ -445,6 +528,7 @@ static FileResult process_file(
 
   const std::string null_seed = std::to_string(rules.null_seed);
   const std::string mcv_seed = std::to_string(rules.mcv_seed);
+  const std::string key_skew_seed = std::to_string(rules.key_skew_seed);
   const std::string token = path.filename().string();
 
   uint64_t row_index = 0;
@@ -467,6 +551,15 @@ static FileResult process_file(
             table,
             token,
             row_token,
+            rules.null_marker);
+      }
+      // Key skew runs before stringification, matching the python pipeline:
+      // decisions/replacements operate on raw keys and identities.
+      if (has_key_skew) {
+        apply_key_skew(
+            row,
+            rules.key_skew_rules.at(table),
+            key_skew_seed,
             rules.null_marker);
       }
       if (has_stringify) {
@@ -512,7 +605,9 @@ static bool table_has_rules(const RuleSet& rules, const std::string& table) {
   const bool has_nulls =
       rules.nulls_enabled && rules.null_rules.count(table) > 0;
   const bool has_mcv = rules.mcv_enabled && rules.mcv_rules.count(table) > 0;
-  return has_stringify || has_nulls || has_mcv;
+  const bool has_key_skew =
+      rules.key_skew_enabled && rules.key_skew_rules.count(table) > 0;
+  return has_stringify || has_nulls || has_mcv || has_key_skew;
 }
 
 static int resolve_worker_count(int requested, size_t task_count) {
@@ -545,7 +640,11 @@ static void write_summary_json(
   out << "{\n";
   out << "  \"files_rewritten\": " << stats.files_rewritten << ",\n";
   out << "  \"rows_rewritten\": " << stats.rows_rewritten << ",\n";
-  out << "  \"duration_s\": " << std::fixed << std::setprecision(6) << stats.duration_s << "\n";
+  out << "  \"duration_s\": " << std::fixed << std::setprecision(6) << stats.duration_s << ",\n";
+  // Capability marker: lets the python wrapper detect a stale binary that would
+  // silently drop requested key-skew rules.
+  out << "  \"key_skew_entity_supported\": true,\n";
+  out << "  \"key_skew_applied\": " << (stats.key_skew_applied ? "true" : "false") << "\n";
   out << "}\n";
 }
 
@@ -617,6 +716,8 @@ static int run_rewrite(int argc, char** argv) {
     }
 
     RewriteStats stats;
+    stats.key_skew_applied =
+        rules.key_skew_enabled && !rules.key_skew_rules.empty();
     if (tasks.empty()) {
       if (!summary_json.empty()) {
         write_summary_json(summary_json, stats);

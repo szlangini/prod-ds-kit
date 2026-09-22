@@ -35,6 +35,10 @@
  define YEAR = random(1998, 2002, uniform);
  define SALES_DATE=date([YEAR]+"-08-01",[YEAR]+"-08-30",sales);
  define _LIMIT=1000;
+define SCOUNTY = ulist(random(1, rowcount("active_counties", "store"), uniform), 3);
+define SSTATE_A = distmember(fips_county, [SCOUNTY.1], 3);
+define SSTATE_B = distmember(fips_county, [SCOUNTY.2], 3);
+define SSTATE_C = distmember(fips_county, [SCOUNTY.3], 3);
 with ssr as
  (select  s_store_id as store_id,
           sum(ss_ext_sales_price) as sales,
@@ -52,7 +56,7 @@ with ssr as
                   and (cast('[SALES_DATE]' as date) +  30 days)
        and ss_store_sk = s_store_sk
        and ss_item_sk = i_item_sk
-       and s_state in ('CA','WA','GA','TX')
+       and s_state in ('[SSTATE_A]','[SSTATE_B]','[SSTATE_C]')
        and i_current_price > 50
        and ss_promo_sk = p_promo_sk
        and p_channel_tv = 'N'

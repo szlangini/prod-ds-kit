@@ -64,6 +64,32 @@ columns no longer carry NULLs, `fleet_realworld_final`'s `column_selection_fract
 was nudged 0.24 → 0.26 so the remaining (safe) columns still reproduce the
 production share (~12% of columns ≥ 0.5 NULL, top decile 60–100%).
 
+### Small-dimension floor
+
+A column's NULL probability is a size-independent statistical target. On a
+dimension with only a handful of rows it degenerates: at SF1 `store` has 12 rows
+and `warehouse` 5, so a 0.9 probability on `s_market_desc` or `w_state` leaves
+0–1 non-NULL rows and every predicate on the column (`w_state in (...)`,
+`s_market_desc is not null`) is empty by construction — at SF100 `warehouse`
+still has only 15 rows. The injector therefore keeps at least
+`min_nonnull_rows` (default 4, `stringify.NULL_MIN_NONNULL_ROWS`) naturally
+non-NULL rows of every nulled column:
+
+- The floor only binds where `p > 1 − k/n`; every other rule is untouched, so
+  data for all other columns is byte-identical to the unfloored run. It can
+  never bind on tables with more than ~800 rows.
+- Where it binds, exactly `n − k` rows are nulled: the rule's probability is
+  replaced by a threshold placed between the `(n−k)`-th and `(n−k+1)`-th
+  smallest per-row hash. The per-row decision stays `hash < probability`, so the
+  Python and C++ backends null the very same rows and a Bernoulli draw's
+  variance (large relative to 12 rows) is removed.
+- Naturally NULL cells (dsdgen's own NULLs) never count as survivors.
+- `dbgen_version` (a 1-row metadata table no query touches) is exempt
+  (`floor_exempt_tables`); `min_nonnull_rows: 0` disables the floor.
+- The manifest (`_stringify_summary.json`, `nulls.small_table_floor`) lists every
+  capped column with its profile target and realized probability; capped rules
+  also carry `target_probability` / `floor_rows`.
+
 ## Per-Column Assignment Algorithm
 
 For each eligible column `c` in table `t`, with global seed `s`, the following

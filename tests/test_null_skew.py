@@ -189,7 +189,9 @@ class NullSkewTests(unittest.TestCase):
         self.assertAlmostEqual(expected, injector.selection_fraction, places=6)
 
     def test_rewrite_integration_smoke(self) -> None:
-        tables = {"warehouse": 4, "store_sales": 3}
+        # Enough rows that the small-dimension floor (>= 4 non-NULL rows per
+        # column) does not bind at p = 0.4 and NULL markers actually appear.
+        tables = {"warehouse": 40, "store_sales": 30}
         overrides = {
             "column_selection_fraction": 1.0,
             "buckets": [{"weight": 1.0, "min": 0.4, "max": 0.4}],

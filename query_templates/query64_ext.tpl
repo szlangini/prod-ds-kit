@@ -36,6 +36,7 @@
 define COLOR=ulist(dist(colors,1,1),6);
 define PRICE=random(0,85,uniform);
 define YEAR = random(1999, 2001, uniform);
+define CASTATE = ulist(dist(fips_county, 3, 1), 3);
 with cs_ui as
  (select cs_item_sk
         ,sum(cs_ext_list_price) as sale,sum(cr_refunded_cash+cr_reversed_charge+cr_store_credit) as refund
@@ -111,8 +112,7 @@ cross_sales as
          cd1.cd_marital_status <> cd2.cd_marital_status and
          i_color in ('[COLOR.1]','[COLOR.2]','[COLOR.3]','[COLOR.4]','[COLOR.5]','[COLOR.6]') and
          i_current_price between [PRICE] and [PRICE] + 10 and
-         ad1.ca_city in ('Seattle','Austin','Miami') and
-         ad2.ca_city in ('Seattle','Austin','Miami')
+         ad2.ca_state not in ('[CASTATE.1]','[CASTATE.2]','[CASTATE.3]')
 group by i_product_name
        ,i_item_sk
        ,s_store_name

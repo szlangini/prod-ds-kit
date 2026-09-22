@@ -32,6 +32,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
+from plot_results import set_title, add_title_argument, apply_title_argument  # noqa: E402
+
 try:
     from experiments.plot_results import (  # noqa: E402
         ENGINE_COLORS,
@@ -79,7 +81,9 @@ def main() -> None:
                     help="Per-scale results dir, e.g. .reproduce/sf100/results")
     ap.add_argument("--output-dir", required=True, type=Path,
                     help="Where to write fig_str_crossengine.{png,pdf}")
+    add_title_argument(ap)
     args = ap.parse_args()
+    apply_title_argument(args)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     out_png = args.output_dir / "fig_str_crossengine.png"
 
@@ -108,7 +112,7 @@ def main() -> None:
         ax.axhline(1.0, color="#999", ls="--", lw=0.8)
         ax.set_xlabel("Stringification level (STR type coverage)")
         ax.set_ylabel("Median per-query runtime\n(normalized to each engine's lowest STR)")
-        ax.set_title("Stringification cross-engine — who degrades worst", pad=8)
+        set_title(ax, "Stringification cross-engine — who degrades worst", pad=8)
         ax.legend(loc="upper left")
         fig.text(0.5, -0.01,
                  "Per-query median ratio vs the engine's lowest STR level (common-query set). "

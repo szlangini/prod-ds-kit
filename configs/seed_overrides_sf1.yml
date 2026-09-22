@@ -1,0 +1,39 @@
+meta:
+  max_attempts: 200
+  scale: '1'
+  seed_start: 20000
+  timeout_ms: 300000
+  note: 'Pinned per-template dsqgen seeds for the shipped default workload at this
+    scale factor; found on the default Prod-DS data (STR=5, medium NULL/MCV/key-skew
+    tiers) and valid for every stringification level and dialect. Regenerate: tools/find_nonempty_seeds.py;
+    verify: tools/query_gate.py.'
+queries:
+  query_24.sql:
+    seed: 20123
+    template: query24_ext.tpl
+  query_30.sql:
+    seed: 20008
+    template: query30_ext.tpl
+  query_41.sql:
+    seed: 20000
+    template: query41_ext.tpl
+  query_44.sql:
+    seed: 20004
+    template: query44_ext.tpl
+  query_54.sql:
+    seed: 20012
+    template: query54_ext.tpl
+  query_68.sql:
+    seed: 20000
+    template: query68_ext.tpl
+  query_8.sql:
+    seed: 20002
+    template: query8_ext.tpl
+  query_82.sql:
+    seed: 20000
+    template: query82_ext.tpl
+  query_91.sql:
+    seed: 20000
+    template: query91.tpl
+unresolved:
+  query_4.sql: no_nonempty_seed_within_budget

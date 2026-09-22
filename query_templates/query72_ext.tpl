@@ -37,6 +37,10 @@ define YEAR=random(1998, 2002, uniform);
 define _LIMIT=1000;
 define BP= text({"1001-5000",1},{">10000",1},{"501-1000",1});
 define MS= dist(marital_status, 1, 1);
+define WCOUNTY = ulist(random(1, rowcount("active_counties", "warehouse"), uniform), 3);
+define WSTATE_A = distmember(fips_county, [WCOUNTY.1], 3);
+define WSTATE_B = distmember(fips_county, [WCOUNTY.2], 3);
+define WSTATE_C = distmember(fips_county, [WCOUNTY.3], 3);
 
 [_LIMITA] select [_LIMITB] i_item_desc
       ,w_warehouse_name
@@ -65,7 +69,7 @@ where d1.d_week_seq = d2.d_week_seq
   and cd_marital_status = '[MS]'
   and i_category in ('Books','Electronics','Home')
   and i_class is not null
-  and w_state in ('CA','WA','GA','TX')
+  and w_state in ('[WSTATE_A]','[WSTATE_B]','[WSTATE_C]')
 group by i_item_desc,w_warehouse_name,d1.d_week_seq
 order by total_cnt desc, promo desc, no_promo desc, d1.d_week_seq desc
 [_LIMITC];

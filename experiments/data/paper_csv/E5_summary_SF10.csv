@@ -1,0 +1,55 @@
+scale,tier,engine,arm,arm_label,n_queries,baseline_total_s,sum_delta_pct,median_delta_pct,p90_delta_pct,worst_delta_pct,worst_query,best_delta_pct,best_query,n_faster_gt2pct,n_slower_gt2pct
+SF10,high,cedardb,sparsity_only,NULL sparsity only,95,238.9,+2.6,-1.9,+9.6,+1548.3,Q51,-91.3,Q59,47,28
+SF10,high,cedardb,skew_only,value skew only (MCV),95,238.9,-2.5,-0.8,+6.8,+47.8,Q82,-82.6,Q22,42,24
+SF10,high,cedardb,keyskew_only,key skew only,95,238.9,+0.2,-0.7,+29.7,+838.1,Q4,-79.6,Q7,42,35
+SF10,high,cedardb,skew_all,value + key skew,95,238.9,-1.3,-1.3,+34.6,+835.8,Q4,-82.9,Q22,44,31
+SF10,high,cedardb,combined,NULL + value skew,95,238.9,+1.2,-4.8,+7.3,+1517.2,Q51,-91.5,Q59,59,26
+SF10,high,cedardb,full,NULL + value + key (default),95,238.9,+2.2,-7.1,+23.2,+1529.9,Q51,-92.8,Q59,58,23
+SF10,high,duckdb,sparsity_only,NULL sparsity only,95,43.2,-3.3,-2.1,+3.0,+11.1,Q49,-46.3,Q43,48,17
+SF10,high,duckdb,skew_only,value skew only (MCV),95,43.2,-4.7,-0.7,+4.4,+9.8,Q73,-65.7,Q22,37,23
+SF10,high,duckdb,keyskew_only,key skew only,95,43.2,+0.1,-3.3,+3.9,+709.3,Q25,-57.5,Q46,57,15
+SF10,high,duckdb,skew_all,value + key skew,95,43.2,-4.6,-5.3,+3.7,+531.3,Q25,-66.2,Q22,64,14
+SF10,high,duckdb,combined,NULL + value skew,95,43.2,-6.6,-3.6,+2.3,+15.8,Q64,-66.3,Q22,61,11
+SF10,high,duckdb,full,NULL + value + key (default),95,43.2,-5.9,-7.0,+5.1,+540.2,Q25,-65.4,Q22,69,14
+SF10,high,monetdb,sparsity_only,NULL sparsity only,95,361.2,+4.3,-0.8,+9.6,+135.3,Q51,-68.7,Q59,42,30
+SF10,high,monetdb,skew_only,value skew only (MCV),95,361.2,-3.7,-2.1,+5.2,+46.1,Q76,-76.2,Q57,48,23
+SF10,high,monetdb,keyskew_only,key skew only,95,361.2,+3.0,-1.0,+10.1,+84.3,Q15,-80.7,Q81,45,30
+SF10,high,monetdb,skew_all,value + key skew,95,361.2,-5.9,-4.2,+11.3,+79.3,Q15,-81.3,Q81,53,24
+SF10,high,monetdb,combined,NULL + value skew,95,361.2,-3.4,-3.0,+5.9,+116.2,Q51,-72.7,Q57,52,24
+SF10,high,monetdb,full,NULL + value + key (default),95,361.2,-1.0,-8.4,+8.0,+132.4,Q51,-80.5,Q7,65,18
+SF10,low,cedardb,sparsity_only,NULL sparsity only,95,235.5,+0.8,+1.0,+9.3,+45.0,Q24,-25.0,Q82,24,34
+SF10,low,cedardb,skew_only,value skew only (MCV),95,235.5,+0.1,+0.7,+8.7,+25.0,Q45,-48.3,Q57,27,36
+SF10,low,cedardb,keyskew_only,key skew only,95,235.5,+1.6,-0.1,+16.7,+553.7,Q4,-43.1,Q35,31,32
+SF10,low,cedardb,skew_all,value + key skew,95,235.5,+0.7,-0.2,+26.8,+553.7,Q4,-47.6,Q57,39,34
+SF10,low,cedardb,combined,NULL + value skew,95,235.5,-0.1,+0.0,+4.5,+31.4,Q45,-47.8,Q57,31,24
+SF10,low,cedardb,full,NULL + value + key (default),95,235.5,+2.0,+0.0,+20.0,+561.0,Q4,-47.3,Q57,38,31
+SF10,low,duckdb,sparsity_only,NULL sparsity only,95,43.3,-0.0,-0.1,+2.7,+9.7,Q75,-10.0,Q38,28,13
+SF10,low,duckdb,skew_only,value skew only (MCV),95,43.3,+0.3,-0.5,+3.0,+9.1,union_U10,-20.1,Q57,28,20
+SF10,low,duckdb,keyskew_only,key skew only,95,43.3,-1.0,-1.1,+5.8,+74.5,Q25,-44.8,Q46,40,23
+SF10,low,duckdb,skew_all,value + key skew,95,43.3,-2.0,-2.0,+4.9,+75.7,Q25,-44.4,Q46,47,20
+SF10,low,duckdb,combined,NULL + value skew,95,43.3,-0.0,-0.8,+3.6,+13.7,union_U20,-18.4,Q57,35,19
+SF10,low,duckdb,full,NULL + value + key (default),95,43.3,-1.6,-2.1,+6.4,+74.1,Q25,-45.8,Q46,49,21
+SF10,low,monetdb,sparsity_only,NULL sparsity only,95,350.3,+7.5,+1.8,+10.0,+30.5,Q14,-26.8,Q30,23,46
+SF10,low,monetdb,skew_only,value skew only (MCV),95,350.3,-2.7,-2.4,+3.0,+62.7,Q72,-50.0,Q57,53,17
+SF10,low,monetdb,keyskew_only,key skew only,95,350.3,+6.4,-1.0,+9.4,+23.8,Q25,-60.9,Q46,41,37
+SF10,low,monetdb,skew_all,value + key skew,95,350.3,+1.5,-1.5,+9.4,+71.7,Q72,-56.7,Q46,43,26
+SF10,low,monetdb,combined,NULL + value skew,95,350.3,+1.6,+0.1,+5.7,+49.7,Q72,-46.0,Q57,22,30
+SF10,low,monetdb,full,NULL + value + key (default),95,350.3,+2.8,-1.9,+10.5,+52.2,Q72,-58.1,Q46,45,25
+SF10,medium,cedardb,sparsity_only,NULL sparsity only,95,236.4,+4.5,-1.4,+5.5,+1532.9,Q51,-71.2,Q59,42,24
+SF10,medium,cedardb,skew_only,value skew only (MCV),95,236.4,-1.6,-0.8,+6.1,+26.4,Q29,-82.5,Q22,39,26
+SF10,medium,cedardb,keyskew_only,key skew only,95,236.4,+1.2,-0.8,+20.9,+685.4,Q4,-54.1,Q7,43,28
+SF10,medium,cedardb,skew_all,value + key skew,95,236.4,+0.1,-2.8,+17.4,+686.9,Q4,-80.8,Q22,50,28
+SF10,medium,cedardb,combined,NULL + value skew,95,236.4,+2.4,-3.9,+7.4,+1541.6,Q51,-83.3,Q22,59,17
+SF10,medium,cedardb,full,NULL + value + key (default),95,236.4,+3.9,-4.7,+22.0,+1558.3,Q51,-82.6,Q22,56,24
+SF10,medium,duckdb,sparsity_only,NULL sparsity only,95,43.3,-3.1,-3.3,+0.7,+25.0,Q64,-19.1,Q59,58,8
+SF10,medium,duckdb,skew_only,value skew only (MCV),95,43.3,-4.5,-1.1,+3.2,+12.1,Q79,-66.8,Q22,40,20
+SF10,medium,duckdb,keyskew_only,key skew only,95,43.3,-1.3,-1.1,+3.6,+88.7,Q25,-43.1,Q46,41,21
+SF10,medium,duckdb,skew_all,value + key skew,95,43.3,-5.3,-1.6,+2.9,+69.7,Q25,-66.5,Q22,44,16
+SF10,medium,duckdb,combined,NULL + value skew,95,43.3,-6.2,-3.3,+1.7,+13.5,union_U10,-66.1,Q22,58,7
+SF10,medium,duckdb,full,NULL + value + key (default),95,43.3,-6.3,-4.4,+3.8,+61.7,Q25,-66.8,Q22,54,16
+SF10,medium,monetdb,sparsity_only,NULL sparsity only,95,357.3,+3.9,-0.5,+5.9,+134.9,Q51,-56.2,Q59,39,27
+SF10,medium,monetdb,skew_only,value skew only (MCV),95,357.3,+0.4,+0.0,+8.0,+21.2,Q67,-74.9,Q57,32,27
+SF10,medium,monetdb,keyskew_only,key skew only,95,357.3,+0.4,-1.2,+6.7,+43.6,Q15,-65.9,Q81,42,31
+SF10,medium,monetdb,skew_all,value + key skew,95,357.3,-5.6,-3.4,+8.3,+57.1,Q15,-75.6,Q57,58,17
+SF10,medium,monetdb,combined,NULL + value skew,95,357.3,-1.7,-5.0,+4.3,+123.2,Q51,-77.7,Q57,62,16
+SF10,medium,monetdb,full,NULL + value + key (default),95,357.3,-5.6,-8.1,+9.6,+111.5,Q51,-78.0,Q57,62,18

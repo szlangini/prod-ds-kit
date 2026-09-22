@@ -11,7 +11,8 @@ python3 wrap_dsdgen.py --default        # STR=5, NULL=medium, MCV=medium, SF=10
 python3 wrap_dsqgen.py --default        # 107 queries (99 standard + 8 micro-suite)
 
 ## Reproduce Paper Results
-./reproduce.sh --all --sf 1 --engines all   # Full end-to-end (E1-E5 + plots)
+./reproduce.sh --experiment E0 --sf 1 --engines all  # audit first: writes common_subset.json
+./reproduce.sh --all --sf 1 --engines all   # E1-E5 + plots (--all excludes E0 and E4X)
 
 ## Run Tests
 pytest tests/ -v

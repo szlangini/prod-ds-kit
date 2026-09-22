@@ -36,6 +36,10 @@
 define YEAR = random(1998,2002,uniform);
 define MONTH = random(8,10,uniform);
 define _LIMIT=100;
+define SCOUNTY = ulist(random(1, rowcount("active_counties", "store"), uniform), 3);
+define SSTATE_A = distmember(fips_county, [SCOUNTY.1], 3);
+define SSTATE_B = distmember(fips_county, [SCOUNTY.2], 3);
+define SSTATE_C = distmember(fips_county, [SCOUNTY.3], 3);
 select s_store_name
   ,s_company_id
   ,s_street_number
@@ -70,7 +74,7 @@ and sr_returned_date_sk   = d2.d_date_sk
 and ss_customer_sk = sr_customer_sk
 and ss_store_sk = s_store_sk
 and s_company_name is not null
-and s_state in ('CA','NY','TX')
+and s_state in ('[SSTATE_A]','[SSTATE_B]','[SSTATE_C]')
 and s_city is not null
 and s_manager is not null
 and s_market_desc is not null

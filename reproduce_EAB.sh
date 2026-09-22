@@ -59,8 +59,9 @@
 #     the OTHER suites (experiments/data/s7_cdf/); that figure is skipped if absent.
 #
 #  ---- 7. Measurement protocol / determinism ---------------------------------
-#     threads=56 · per-query timeout=1800 s · WARMUP=1 untimed pass + REPS=10
-#     timed repetitions, MEDIAN reported. This is the paper protocol (Sec 6.2) and
+#     threads=56 · per-query timeout=1800 s · WARMUP=1 (first query of each suite
+#     once, untimed) + REPS=10 timed repetitions, MEDIAN reported. This is the
+#     paper protocol (Sec 6.2) and
 #     matches REPRODUCIBILITY.md exactly. --quick forces REPS=1. Data-gen is
 #     seeded. Committee criterion = BEHAVIORAL agreement (same trends / cliffs /
 #     failure modes), not exact milliseconds.
@@ -101,7 +102,7 @@ RAW="$ROOT/.reproduce"                                   # namespace: sf<scale>/
 ENGINES="${ENGINES:-duckdb cedardb monetdb}"
 THREADS="${THREADS:-56}"
 TIMEOUT="${TIMEOUT:-1800}"
-WARMUP="${WARMUP:-1}"     # paper protocol: 1 untimed warmup pass
+WARMUP="${WARMUP:-1}"     # paper protocol: first query of each suite once, untimed
 REPS="${REPS:-10}"       # paper protocol: 10 timed repetitions (MEDIAN reported)
 SF_E1="${SF_E1:-100}"; SF_E2="${SF_E2:-100}"; SF_E3="${SF_E3:-100}"
 SF_E4="${SF_E4:-10}"; SF_E4X="${SF_E4X:-10}"; SF_E5="${SF_E5:-10}"   # paper scales: E1-E3 SF100, E4/E4X/E5 SF10. Per-experiment override via SF_Ex env vars; --quick forces SF1.
@@ -170,7 +171,7 @@ phase_E5(){ M "PHASE E5 — sparsity/skew intensity sweep low/medium/high (table
   for tier in ${E5_TIERS:-low medium high}; do
     M "  E5 tier=$tier"; export E5_PROFILE="$tier"
     for e in $ENGINES; do run_one E5 "$e" "$s"; done
-    for v in baseline sparsity_only skew_only combined; do
+    for v in baseline sparsity_only skew_only keyskew_only skew_all combined full; do
       [ "$tier" = medium ] && free_variant_data "$s" "$v" || free_variant_data "$s" "${v}_${tier}"; done
   done; unset E5_PROFILE
   rm -rf "$RAW/sf${s}/data/sparsity" 2>/dev/null || true; }   # phase-end safety net: clear all sparsity variant residue across tiers
@@ -180,9 +181,22 @@ phase_figures(){ M "PHASE FIGURES — render all figures + tables (in-repo) -> $
   local fl="$LOGD/figures.log"; : > "$fl"
   local sc rdir
   for sc in $(printf '%s\n' "$(scale E1)" "$(scale E2)" "$(scale E3)" "$(scale E4)" "$(scale E4X)" "$(scale E5)" | sort -un); do
-    rdir="$RAW/sf${sc}/results"
+    rdir="$RAW/sf${sc}/results${RESULTS_TAG:+_$RESULTS_TAG}"   # RESULTS_TAG: same namespace reproduce.sh writes to
     [ -d "$rdir" ] || continue   # render figures from a completed run's results
-    "$PY" experiments/plot_results.py         --results-dir "$rdir" --output-dir "$FIGD" >>"$fl" 2>&1 || warn "plot_results sf${sc}"
+    # Evaluation step 1 (docs/experimental-protocol.md): common success subset across the
+    # audited engines + per-engine failure attribution (near-timeout rule, 60 s). The E1
+    # runtime figures are restricted to it; the report is published with the tables.
+    local cs=() csexp=E1
+    [ -d "$rdir/E0" ] && csexp=E0   # the audit pass (E0) is the protocol's source of the subset when present
+    if [ -d "$rdir/$csexp" ]; then
+      if "$PY" experiments/common_subset.py --results-dir "$rdir" --experiment "$csexp" --timeout-s "${TIMEOUT:-1800}" >>"$fl" 2>&1; then
+        cs=(--common-subset "$rdir/common_subset.json")
+        cp -f "$rdir/common_subset.md" "$TABD/common_subset_sf${sc}.md"
+      else warn "common subset sf${sc}"; fi
+    fi
+    "$PY" experiments/plot_results.py         --results-dir "$rdir" --output-dir "$FIGD" "${cs[@]}" >>"$fl" 2>&1 || warn "plot_results sf${sc}"
+    # Per-figure/table CSV bundle + run provenance (engine versions, git hashes, host) -> experiments/data/paper_csv/
+    "$PY" experiments/export_paper_csv.py     --results-dir "$rdir" --timeout-s "${TIMEOUT:-1800}" >>"$fl" 2>&1 || warn "paper csv export sf${sc}"
     "$PY" experiments/plot_str_crossengine.py --results-dir "$rdir" --output-dir "$FIGD" >>"$fl" 2>&1 || warn "str_crossengine sf${sc}"
     "$PY" experiments/make_skew_table.py      --repo "$ROOT" --sf "$sc" --tiers --out "$TABD/table_skew_nullity.tex" >>"$fl" 2>&1 || warn "skew tier table sf${sc}"
   done
@@ -190,7 +204,21 @@ phase_figures(){ M "PHASE FIGURES — render all figures + tables (in-repo) -> $
   note "figures: $(ls "$FIGD"/*.pdf 2>/dev/null|wc -l) PDFs · tables: $(ls "$TABD"/*.tex 2>/dev/null|wc -l)"; }
 
 # ---- main -------------------------------------------------------------------
-run_all(){ phase_E1; phase_E2; phase_E3; phase_E4; phase_E4X; phase_E5; phase_figures; }
+# The audit pass. E1 and E5 execute only the common subset, and common_subset.json is written
+# per scale factor -- so E0 has to run at every scale a subset-consuming experiment uses, which
+# is SF_E1 and SF_E5 and those differ (100 and 10 by default). Without it the subset would be
+# derived from E1's own timed results, which is circular and spends timed repetitions on queries
+# some engine cannot run -- the two things docs/experimental-protocol.md says the audit prevents.
+phase_E0(){ local s seen=""
+  for v in E1 E5; do s=$(scale "$v")
+    case " $seen " in *" $s "*) continue ;; esac
+    seen="$seen $s"
+    M "PHASE E0 — audit pass, untimed, SF${s} (writes common_subset.json for E1/E5)"
+    # reproduce.sh::run_e0 forces REPS=1 / WARMUP=0 itself and restores them afterwards,
+    # so the audit is untimed regardless of what --reps was given here.
+    for e in $ENGINES; do run_one E0 "$e" "$s"; done
+  done; }
+run_all(){ phase_E0; phase_E1; phase_E2; phase_E3; phase_E4; phase_E4X; phase_E5; phase_figures; }
 summary(){ M "RUN COMPLETE — artifact in $EAB"
   if [ "${#FAILS[@]}" -gt 0 ]; then warn "${#FAILS[@]} unit(s) non-zero:"; printf '         - %s\n' "${FAILS[@]}"|tee -a "$RUN_LOG"
     note "(a non-zero unit can BE the result: MonetDB timeout / CedarDB OOM — check its log)"
@@ -207,6 +235,7 @@ TARGET="${1:-all}"
 M "reproduce_EAB start — target=$TARGET quick=$QUICK engines='$ENGINES' warmup=$WARMUP reps=$REPS scales(E1-5)=$SF_E1/$SF_E2/$SF_E3/$SF_E4/$SF_E5 (free $(freeg)G)"
 case "$TARGET" in
   all) run_all ;;
+  E0) phase_E0 ;;
   E1) phase_E1 ;; E2) phase_E2 ;; E3) phase_E3 ;; E4) phase_E4 ;; E4X) phase_E4X ;; E5) phase_E5 ;;
   figures) phase_figures ;;
   clean) M "CLEAN — removing results + artifact (data kept)"; clean_monetdb_daemons; rm -rf "$RAW"/sf*/results "$EAB"; echo "       done"; exit 0 ;;

@@ -30,7 +30,14 @@ REPO_ROOT = Path(__file__).resolve().parent
 TPCDS_KIT_DIR = REPO_ROOT / "tpcds-kit"
 TOOLS_DIR = TPCDS_KIT_DIR / "tools"
 DSQGEN_CANDIDATES = ("dsqgen", "dsqgen.bin", "dsqgen.exe")
-UNION_FANIN_TARGETS = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]  # powers of 2 — same log2 grid as CANONICAL_JOIN_SCALING_LEVELS so the join & union amplification figures are directly comparable
+# Workload-set union fan-in levels: the paper's 107-query composition is the 99
+# templates + J50/J100/J200 + exactly these five UNION ALL fan-ins (Fig 2/3/6,
+# Table 3 and the E1 end-to-end figures were measured on that set).
+UNION_FANIN_TARGETS = [2, 5, 10, 20, 200]
+# E3 fan-in ladder (--union-max-inputs N): powers of 2 — same log2 grid as
+# CANONICAL_JOIN_SCALING_LEVELS so the join & union amplification figures are
+# directly comparable. Lives in its own query dir (queries/union_scaling).
+UNION_LADDER_TARGETS = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
 DEFAULT_JOIN_TARGETS = [50, 100, 200]
 CANONICAL_JOIN_SCALING_LEVELS = {1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048}
 DEFAULT_SEED_OVERRIDES_DIR = REPO_ROOT / "configs"
@@ -254,9 +261,46 @@ def _truncate_query_to_first_statement(sql: str) -> str:
     return sql.strip()
 
 
+_APOSTROPHE_VALUES_CACHE: tuple[str, ...] | None = None
+
+
+def _distribution_apostrophe_values() -> tuple[str, ...]:
+    """Active dsqgen distribution values (tpcds-kit/tools/*.dst) that contain an
+    apostrophe. dsqgen substitutes them verbatim into single-quoted literals
+    (`'CÔTE D'IVOIRE'`), which is a syntax error; see _escape_distribution_apostrophes."""
+    global _APOSTROPHE_VALUES_CACHE
+    if _APOSTROPHE_VALUES_CACHE is not None:
+        return _APOSTROPHE_VALUES_CACHE
+    values = {"CÔTE D'IVOIRE"}  # fallback when the toolkit is not checked out
+    for dst in sorted(TOOLS_DIR.glob("*.dst")):
+        try:
+            text = dst.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("--"):
+                continue
+            values.update(re.findall(r'"([^"]*\'[^"]*)"', stripped))
+    _APOSTROPHE_VALUES_CACHE = tuple(sorted(values, key=len, reverse=True))
+    return _APOSTROPHE_VALUES_CACHE
+
+
+def _escape_distribution_apostrophes(sql: str) -> str:
+    """Escape apostrophes inside literals that dsqgen copied from a distribution
+    value, so the generated SQL parses. Idempotent."""
+    if "'" not in sql:
+        return sql
+    for value in _distribution_apostrophe_values():
+        needle = f"'{value}'"
+        if needle in sql:
+            sql = sql.replace(needle, "'" + value.replace("'", "''") + "'")
+    return sql
+
+
 def _sanitize_query_files(output_dir: Path) -> None:
     for path in output_dir.glob("*.sql"):
-        raw = path.read_text(encoding="utf-8")
+        raw = _escape_distribution_apostrophes(path.read_text(encoding="utf-8"))
         # Drop start/end markers and truncate to the first statement.
         lines = [line for line in raw.splitlines() if not line.strip().startswith("-- start query") and not line.strip().startswith("-- end query")]
         cleaned = _truncate_query_to_first_statement("\n".join(lines))
@@ -265,6 +309,7 @@ def _sanitize_query_files(output_dir: Path) -> None:
 
 
 def _sanitize_generated_sql(sql: str) -> str:
+    sql = _escape_distribution_apostrophes(sql)
     lines = [
         line
         for line in sql.splitlines()
@@ -421,10 +466,30 @@ def _rewrite_postgres_sql(filename: str, sql: str) -> str:
     return sql
 
 
-def _postprocess_postgres(output_dir: Path) -> None:
+def _fixer_key_for(filename: str, streams_perm: dict[int, int] | None) -> str:
+    """Name under which the per-query dialect fixers must be looked up.
+
+    The fixers (`_rewrite_query_N`, `_rewrite_duckdb_query_fixes`) are keyed by
+    TEMPLATE number, but in STREAMS mode dsqgen writes template N to a permuted
+    output position. Map the output position back to the template so
+    `query_93.sql` holding template 4 gets template 4's fixes, not "query 93"'s.
+    """
+    if not streams_perm:
+        return filename
+    m = re.match(r"query_(\d+)\.sql$", filename, flags=re.IGNORECASE)
+    if not m:
+        return filename
+    position = int(m.group(1))
+    position_to_template = {pos: tpl for tpl, pos in streams_perm.items()}
+    template = position_to_template.get(position)
+    return f"query_{template}.sql" if template is not None else filename
+
+
+def _postprocess_postgres(output_dir: Path, streams_perm: dict[int, int] | None = None) -> None:
     for path in output_dir.glob("*.sql"):
         sql = path.read_text(encoding="utf-8")
-        path.write_text(_rewrite_postgres_sql(path.name, sql), encoding="utf-8")
+        key = _fixer_key_for(path.name, streams_perm)
+        path.write_text(_rewrite_postgres_sql(key, sql), encoding="utf-8")
 
 
 def _rewrite_duckdb_query_fixes(filename: str, sql: str) -> str:
@@ -451,14 +516,9 @@ def _rewrite_duckdb_query_fixes(filename: str, sql: str) -> str:
             count=1,
             flags=re.IGNORECASE,
         )
-    elif key == "query_37.sql":
-        sql = re.sub(
-            r"\n\s*and\s+i_manufact_id\s+in\s*\([^)]*\)",
-            "",
-            sql,
-            count=1,
-            flags=re.IGNORECASE,
-        )
+    # Template 37 keeps its i_manufact_id predicate on every dialect (a DuckDB-only
+    # strip used to make DuckDB run a different query than the other engines; an
+    # empty default draw is handled by the shipped seed overrides instead).
     return sql
 
 
@@ -466,10 +526,11 @@ def _rewrite_duckdb_sql(filename: str, sql: str) -> str:
     return _rewrite_duckdb_query_fixes(filename, _rewrite_postgres_sql(filename, sql))
 
 
-def _postprocess_duckdb(output_dir: Path) -> None:
+def _postprocess_duckdb(output_dir: Path, streams_perm: dict[int, int] | None = None) -> None:
     for path in output_dir.glob("*.sql"):
         sql = path.read_text(encoding="utf-8")
-        path.write_text(_rewrite_duckdb_sql(path.name, sql), encoding="utf-8")
+        key = _fixer_key_for(path.name, streams_perm)
+        path.write_text(_rewrite_duckdb_sql(key, sql), encoding="utf-8")
 
 
 def _rewrite_lochierarchy_alias(sql: str) -> str:
@@ -1077,46 +1138,6 @@ def _rewrite_query_66(sql: str) -> str:
     return sql
 
 
-def _rewrite_query_68(sql: str) -> str:
-    sql = re.sub(
-        r"\n\s*,any_value\(store\.s_store_name\)\s+as\s+any_store_name",
-        "",
-        sql,
-        flags=re.IGNORECASE,
-    )
-    sql = re.sub(
-        r"\n\s*,any_value\(store\.s_market_desc\)\s+as\s+any_market_desc",
-        "",
-        sql,
-        flags=re.IGNORECASE,
-    )
-    sql = re.sub(
-        r"\n\s*,count\(distinct current_addr\.ca_state\)\s+as\s+distinct_current_state_count",
-        "",
-        sql,
-        flags=re.IGNORECASE,
-    )
-    sql = re.sub(
-        r"\n\s*,min\(d_date\)\s+as\s+min_sold_date",
-        "",
-        sql,
-        flags=re.IGNORECASE,
-    )
-    sql = re.sub(
-        r"\n\s*,max\(cast\(d_date as timestamp\)\)\s+as\s+max_sold_ts",
-        "",
-        sql,
-        flags=re.IGNORECASE,
-    )
-    sql = re.sub(
-        r"order\s+by\s+extended_price\s+desc\s*,\s*max_sold_ts\s+desc\s*,\s*min_sold_date\s+desc",
-        "order by extended_price desc",
-        sql,
-        flags=re.IGNORECASE,
-    )
-    return sql
-
-
 def _rewrite_query_72(sql: str) -> str:
     # DuckDB can treat unqualified d_week_seq as ambiguous in this query because d1/d2/d3 all expose it.
     sql = re.sub(
@@ -1259,7 +1280,6 @@ def _rewrite_postgres_query_fixes(filename: str, sql: str) -> str:
         "query_58.sql": _rewrite_query_58,
         "query_60.sql": _rewrite_query_60,
         "query_66.sql": _rewrite_query_66,
-        "query_68.sql": _rewrite_query_68,
         "query_72.sql": _rewrite_query_72,
         "query_77.sql": _rewrite_query_77,
         "query_83.sql": _rewrite_query_83,
@@ -1764,10 +1784,13 @@ def _yaml_available() -> bool:
 
 
 def _resolve_union_targets(max_inputs: int | None) -> list[int]:
+    """Workload set (no cap): the paper's five fan-ins. With --union-max-inputs N:
+    the E3 log2 ladder capped at N (N itself is kept when it is not a power of 2)."""
+    if max_inputs is None:
+        return list(UNION_FANIN_TARGETS)
     targets: list[int] = []
-    for t in UNION_FANIN_TARGETS:
-        if max_inputs is not None:
-            t = min(t, max_inputs)
+    for t in UNION_LADDER_TARGETS:
+        t = min(t, max_inputs)
         if t < 2:
             continue
         if t not in targets:
@@ -1914,23 +1937,37 @@ def _resolve_seed_overrides_path(*, scale: str, stringification_level: int) -> P
     )
 
 
+def _resolve_seed_overrides_path_sf(*, scale: str) -> Path:
+    """The shipped per-scale-factor override file (dialect- and STR-independent:
+    a parameter draw is empty or not because of the DATA, so one pinned seed set
+    per scale factor serves every stringification level and every dialect)."""
+    return DEFAULT_SEED_OVERRIDES_DIR / f"seed_overrides_sf{_scale_to_tag(scale)}.yml"
+
+
+def _overrides_file_is_level_specific(path: Path) -> bool:
+    return re.search(r"_str\d+", path.name) is not None
+
+
 def _resolve_seed_overrides_paths(
     *, scale: str, stringification_level: int, dialect: str
 ) -> list[Path]:
+    """Override files in application order (later files win per query):
+    shipped per-SF file -> per-SF/STR file -> per-SF/STR/dialect file."""
+    paths = [_resolve_seed_overrides_path_sf(scale=scale)]
     generic = _resolve_seed_overrides_path(
         scale=scale,
         stringification_level=stringification_level,
     )
+    paths.append(generic)
     suffix = re.sub(r"[^a-z0-9_]+", "", dialect.strip().lower())
-    if not suffix:
-        return [generic]
-    dialect_specific = (
-        DEFAULT_SEED_OVERRIDES_DIR
-        / f"seed_overrides_sf{_scale_to_tag(scale)}_str{int(stringification_level)}_{suffix}.yml"
-    )
-    if dialect_specific == generic:
-        return [generic]
-    return [generic, dialect_specific]
+    if suffix:
+        dialect_specific = (
+            DEFAULT_SEED_OVERRIDES_DIR
+            / f"seed_overrides_sf{_scale_to_tag(scale)}_str{int(stringification_level)}_{suffix}.yml"
+        )
+        if dialect_specific != generic:
+            paths.append(dialect_specific)
+    return paths
 
 
 def _normalize_query_filename(raw: str) -> str | None:
@@ -2148,6 +2185,21 @@ def _generate_single_query_sql(
     return sql
 
 
+def _apply_template_limit(sql: str, template_name: str, template_dir: Path, scale: str | int) -> str:
+    """Apply the per-template LIMIT rule of workload/dsqgen/limit_postprocess.py
+    (template `_LIMIT` x scale factor, only for templates using the _LIMIT macros)
+    to a single regenerated query."""
+    from workload.dsqgen.limit_postprocess import _load_template_limits, _rewrite_limit
+
+    entry = _load_template_limits(Path(template_dir)).get(template_name)
+    if entry is None:
+        return sql
+    has_macro, limit_val = entry
+    desired = limit_val * int(scale) if (has_macro and limit_val is not None) else None
+    rewritten, _ = _rewrite_limit(sql, desired)
+    return rewritten
+
+
 def _apply_seed_overrides(
     *,
     output_dir: Path,
@@ -2165,7 +2217,10 @@ def _apply_seed_overrides(
     overrides = _load_seed_overrides(
         overrides_path,
         expected_scale=scale,
-        expected_stringification_level=stringification_level,
+        # The per-SF file applies to every stringification level.
+        expected_stringification_level=(
+            stringification_level if _overrides_file_is_level_specific(overrides_path) else None
+        ),
     )
     if not overrides:
         return []
@@ -2201,12 +2256,22 @@ def _apply_seed_overrides(
             rng_seed=seed,
         )
         if compat_rewrite:
+            # After the streams remap, query_filename is an OUTPUT position; the
+            # dialect fixers are keyed by TEMPLATE number, so derive the key from
+            # the template actually being generated.
+            tpl_match = re.match(r"query(\d+)", template_name)
+            fixer_key = f"query_{tpl_match.group(1)}.sql" if tpl_match else query_filename
             if dialect.lower() == "duckdb":
-                sql = _rewrite_duckdb_sql(query_filename, sql)
+                sql = _rewrite_duckdb_sql(fixer_key, sql)
             else:
-                sql = _rewrite_postgres_sql(query_filename, sql)
+                sql = _rewrite_postgres_sql(fixer_key, sql)
         if schema_config.schema_selected:
             sql = _rewrite_stringified_literals_sql(sql, config=schema_config)
+        # The main path scales LIMITs in _postprocess_limits (which runs before
+        # _sanitize_query_files strips the "using template" header it keys on).
+        # A regenerated query must get the same treatment, otherwise it ships
+        # with the template's unscaled LIMIT.
+        sql = _apply_template_limit(sql, template_name, template_dir, scale)
         query_path.write_text(sql.rstrip() + "\n", encoding="utf-8")
         print(
             f"[seed-overrides] applied {query_filename} seed={seed} template={template_name}",
@@ -2624,10 +2689,12 @@ def main(argv: list[str] | None = None) -> int:
         duckdb_compat = args.dialect.lower() == "duckdb"
         compat_rewrite = postgres_compat or duckdb_compat
         if compat_rewrite:
+            # Fixers are template-keyed; in STREAMS mode the output position
+            # differs from the template number (see _fixer_key_for).
             if args.dialect.lower() == "duckdb":
-                _postprocess_duckdb(output_dir)
+                _postprocess_duckdb(output_dir, streams_perm or None)
             else:
-                _postprocess_postgres(output_dir)
+                _postprocess_postgres(output_dir, streams_perm or None)
         if schema_config.schema_selected and not pure_data_mode:
             _postprocess_stringified_literals(output_dir, schema_config)
 

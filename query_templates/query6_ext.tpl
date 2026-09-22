@@ -35,6 +35,7 @@
  define YEAR = random(1998, 2002, uniform);
  define MONTH= random(1,7,uniform);
  define _LIMIT=100;
+define BCOUNTRY = ulist(dist(countries, 1, 1), 3);
 select a.ca_state state, count(*) cnt
       ,any_value(i.i_category) as any_item_category
       ,count(distinct i.i_product_name) as distinct_product_name_count
@@ -56,7 +57,7 @@ select a.ca_state state, count(*) cnt
 	and i.i_brand is not null
         and a.ca_state in ('CA','NY','TX')
         and a.ca_country in ('United States','Canada')
-        and c.c_birth_country in ('United States','Canada','Mexico')
+        and c.c_birth_country in ('[BCOUNTRY.1]','[BCOUNTRY.2]','[BCOUNTRY.3]')
         and i.i_color is not null
         and a.ca_city is not null
 group by a.ca_state

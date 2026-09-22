@@ -14,6 +14,10 @@ tpcds-kit/
 workload/dsdgen/stringify_cpp
 
 # Data folders (generated)
+# NOTE: `data/` matches experiments/data/ too, so the per-figure CSV bundle under
+# experiments/data/paper_csv/ is ignored by default and its files are tracked only
+# because they were added with `git add -f`. A regenerated or newly added CSV there
+# will NOT show up in `git status` -- force-add it, or it silently ships stale.
 data/
 data_utf8/
 output/

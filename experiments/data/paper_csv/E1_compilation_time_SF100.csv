@@ -1,0 +1,7 @@
+suite,engine,n_queries,median_planning_ms,mean_planning_ms,p90_planning_ms,max_planning_ms,sum_planning_s,planning_share_of_runtime_pct
+prodds,duckdb,97,240.5,255.2,306.5,358.5,24.75,15.61
+prodds,cedardb,97,36.5,37.3,38.5,93.5,3.62,0.10
+prodds,monetdb,97,18.5,20.6,22.5,126.5,2.00,0.06
+tpcds,duckdb,99,229.5,241.8,288.5,310.5,23.94,21.89
+tpcds,cedardb,99,36.0,38.1,39.0,123.5,3.77,11.79
+tpcds,monetdb,99,18.0,18.0,21.0,29.0,1.78,0.18

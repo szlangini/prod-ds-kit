@@ -238,10 +238,20 @@ class PostgresAdapter(EngineAdapter):
         ]
 
     def version(self) -> str:
-        result = run_command(self._psql_command("SELECT version()"), env=self.env)
+        # psql's default aligned output ends in a "(1 row)" footer, so taking the last
+        # line records the footer instead of the version. Ask for tuples-only, unaligned
+        # output and fall back to filtering the decoration out.
+        cmd = self._psql_command("SELECT version()")
+        cmd = cmd[:1] + ["-t", "-A"] + cmd[1:]
+        result = run_command(cmd, env=self.env)
         if result.returncode != 0:
             return "unknown"
-        return result.stdout.strip().splitlines()[-1]
+        for line in result.stdout.strip().splitlines():
+            line = line.strip()
+            if not line or line.startswith("(") or set(line) <= set("-+ "):
+                continue
+            return line
+        return "unknown"
 
     def _docker_resource_args(self) -> List[str]:
         args: List[str] = ["--memory", str(self.global_cfg.memory_limit_bytes)]

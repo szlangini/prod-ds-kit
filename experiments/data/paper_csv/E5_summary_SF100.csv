@@ -1,0 +1,19 @@
+scale,tier,engine,arm,arm_label,n_queries,baseline_total_s,sum_delta_pct,median_delta_pct,p90_delta_pct,worst_delta_pct,worst_query,best_delta_pct,best_query,n_faster_gt2pct,n_slower_gt2pct
+SF100,medium,cedardb,sparsity_only,NULL sparsity only,94,321.9,+20.2,-0.9,+4.3,+2995.2,Q51,-88.2,Q25,36,26
+SF100,medium,cedardb,skew_only,value skew only (MCV),94,321.9,-3.3,-0.8,+3.4,+86.1,Q95,-85.6,Q22,35,16
+SF100,medium,cedardb,keyskew_only,key skew only,94,321.9,+14.1,-1.8,+99.5,+1162.5,Q72,-77.0,Q93,45,26
+SF100,medium,cedardb,skew_all,value + key skew,94,321.9,+13.9,-2.2,+75.8,+1158.3,Q11,-85.5,Q22,49,25
+SF100,medium,cedardb,combined,NULL + value skew,94,321.9,+17.1,-2.6,+2.0,+3127.2,Q51,-90.4,Q17,55,11
+SF100,medium,cedardb,full,NULL + value + key (default),94,321.9,+31.4,-2.9,+80.3,+3122.7,Q51,-85.6,Q22,51,25
+SF100,medium,duckdb,sparsity_only,NULL sparsity only,94,141.2,-3.5,-2.1,+2.8,+28.8,Q81,-20.0,Q65,48,13
+SF100,medium,duckdb,skew_only,value skew only (MCV),94,141.2,-7.5,-0.6,+3.7,+21.4,Q81,-66.1,Q22,36,20
+SF100,medium,duckdb,keyskew_only,key skew only,94,141.2,-0.9,-3.7,+3.1,+173.6,Q25,-39.6,Q4,55,14
+SF100,medium,duckdb,skew_all,value + key skew,94,141.2,-8.7,-2.1,+4.8,+113.1,Q17,-66.4,Q67,47,21
+SF100,medium,duckdb,combined,NULL + value skew,94,141.2,-5.5,+2.1,+9.4,+23.8,Q81,-66.2,Q22,32,48
+SF100,medium,duckdb,full,NULL + value + key (default),94,141.2,-8.8,-2.6,+7.3,+102.2,Q17,-66.9,Q67,51,22
+SF100,medium,monetdb,sparsity_only,NULL sparsity only,94,1592.4,+10.8,-0.1,+14.1,+149.0,Q51,-70.2,Q20,37,30
+SF100,medium,monetdb,skew_only,value skew only (MCV),94,1592.4,+4.4,-1.0,+6.0,+45.5,Q67,-46.1,Q57,40,27
+SF100,medium,monetdb,keyskew_only,key skew only,94,1592.4,-15.7,-2.4,+11.3,+363.9,Q29,-86.2,Q95,50,26
+SF100,medium,monetdb,skew_all,value + key skew,94,1592.4,-19.7,-7.2,+15.5,+235.6,Q29,-86.5,Q95,59,25
+SF100,medium,monetdb,combined,NULL + value skew,94,1592.4,-6.2,-4.7,+7.1,+134.6,Q51,-70.5,Q20,52,24
+SF100,medium,monetdb,full,NULL + value + key (default),94,1592.4,-13.8,-8.1,+21.7,+262.8,Q29,-86.6,Q95,56,24

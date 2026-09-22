@@ -394,8 +394,14 @@ def main() -> int:
     ap.add_argument(
         "--allow-base-fallback",
         action="store_true",
-        default=True,
-        help="If ext template search fails, try base queryN.tpl with same seed range.",
+        default=False,
+        help=(
+            "If ext template search fails, try base queryN.tpl with same seed range. "
+            "Off by default: wrap_dsqgen re-resolves a recorded base template to its "
+            "_ext variant, so a base fallback is never honoured at generation time. "
+            "An _ext template that stays empty across the seed budget signals a "
+            "template defect (e.g. a literal dsdgen never produces), not a seed problem."
+        ),
     )
     ap.add_argument(
         "--no-base-fallback",

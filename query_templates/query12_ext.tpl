@@ -37,6 +37,7 @@ define YEAR=random(1998,2002,uniform);
 define SDATE=date([YEAR]+"-01-01",[YEAR]+"-07-01",sales);
 define CATEGORY=ulist(dist(categories,1,1),3);
 define _LIMIT=100;
+define BRANDSYL = dist(brand_syllables, 1, 1);
 select i_item_id
       ,i_item_desc 
       ,i_category 
@@ -55,7 +56,7 @@ where
   	and i_category in ('[CATEGORY.1]', '[CATEGORY.2]', '[CATEGORY.3]')
         and i_brand is not null
         and i_product_name is not null
-        and i_brand like 'Brand#1%'
+        and i_brand like '[BRANDSYL]%'
         and i_manufact is not null
   	and ws_sold_date_sk = d_date_sk
 	and d_date between cast('[SDATE]' as date) 

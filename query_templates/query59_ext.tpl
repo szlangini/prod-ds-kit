@@ -34,6 +34,14 @@
 -- 
  define DMS = random(1176,1212,uniform);
  define _LIMIT=100;
+define SCOUNTY = ulist(random(1, rowcount("active_counties", "store"), uniform), 3);
+define SSTATE_A = distmember(fips_county, [SCOUNTY.1], 3);
+define SSTATE_B = distmember(fips_county, [SCOUNTY.2], 3);
+define SSTATE_C = distmember(fips_county, [SCOUNTY.3], 3);
+define SCITYNUM = ulist(random(1, rowcount("active_cities", "store"), uniform), 3);
+define SCITY_A = distmember(cities, [SCITYNUM.1], 1);
+define SCITY_B = distmember(cities, [SCITYNUM.2], 1);
+define SCITY_C = distmember(cities, [SCITYNUM.3], 1);
 with wss as 
  (select d_week_seq,
         ss_store_sk,
@@ -73,9 +81,9 @@ with wss as
   from wss,store,date_dim d
   where d.d_week_seq = wss.d_week_seq and
         ss_store_sk = s_store_sk and 
-        s_state in ('CA','WA','GA','TX') and
+        s_state in ('[SSTATE_A]','[SSTATE_B]','[SSTATE_C]') and
         s_market_desc is not null and
-        s_city in ('Seattle','Atlanta','Denver') and
+        s_city in ('[SCITY_A]','[SCITY_B]','[SCITY_C]') and
         s_company_name is not null and
         d_month_seq between [DMS] and [DMS] + 11) y,
  (select s_store_name s_store_name2,wss.d_week_seq d_week_seq2
@@ -86,7 +94,7 @@ with wss as
   from wss,store,date_dim d
  where d.d_week_seq = wss.d_week_seq and
        ss_store_sk = s_store_sk and 
-       s_state in ('CA','WA','GA','TX') and
+       s_state in ('[SSTATE_A]','[SSTATE_B]','[SSTATE_C]') and
        s_market_desc is not null and
        s_company_name is not null) x
  where s_store_id1=s_store_id2

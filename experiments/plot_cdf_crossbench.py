@@ -15,7 +15,8 @@ import matplotlib.pyplot as plt
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "experiments"))
-from plot_results import apply_style, save_fig, HEIGHT_SCALE, safe_float  # noqa: E402
+from plot_results import (apply_style, save_fig, HEIGHT_SCALE, safe_float,  # noqa: E402
+                          set_title, add_title_argument, apply_title_argument)
 
 # The other suites are measured outside this pipeline; commit the small per-query
 # latency CSVs under experiments/data/s7_cdf/ to make this figure self-contained.
@@ -75,7 +76,7 @@ def plot_cdf(data, order, output_dir, fname, title):
     ax.set_xscale("log")
     ax.set_xlabel("Per-query latency (s, log scale)")
     ax.set_ylabel("CDF")
-    ax.set_title(title)
+    set_title(ax, title)
     ax.set_ylim(0, 1.02)
     ax.legend(loc="lower right", ncol=2, fontsize=7)
     fig.tight_layout()
@@ -89,7 +90,9 @@ def main():
                     help="Dir with cross-benchmark latency CSVs (s7_latencies_sf10.csv / _sf100.csv)")
     ap.add_argument("--e1-dir", type=Path, default=DEFAULT_E1_DIR,
                     help="E1 results dir for Prod-DS/TPC-DS (SF100)")
+    add_title_argument(ap)
     args = ap.parse_args()
+    apply_title_argument(args)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     apply_style()
 

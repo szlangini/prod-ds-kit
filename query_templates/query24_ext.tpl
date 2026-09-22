@@ -37,6 +37,10 @@
 define MARKET=random(5,10,uniform);
 define AMOUNTONE=text({"ss_net_paid",1},{"ss_net_paid_inc_tax",1},{"ss_net_profit",1},{"ss_sales_price",1},{"ss_ext_sales_price",1});
 define COLOR=ulist(dist(colors,1,1),2);
+define SCOUNTY = ulist(random(1, rowcount("active_counties", "store"), uniform), 3);
+define SSTATE_A = distmember(fips_county, [SCOUNTY.1], 3);
+define SSTATE_B = distmember(fips_county, [SCOUNTY.2], 3);
+define SSTATE_C = distmember(fips_county, [SCOUNTY.3], 3);
 with ssales as
 (select c_last_name
       ,c_first_name
@@ -66,7 +70,7 @@ where ss_ticket_number = sr_ticket_number
   and ca_country = 'United States'
   and c_preferred_cust_flag = 'Y'
   and s_zip = ca_zip
-  and s_state in ('CA','TX','NY','WA')
+  and s_state in ('[SSTATE_A]','[SSTATE_B]','[SSTATE_C]')
   and i_units in ('Each','Box','Case')
   and i_color is not null
 group by c_last_name
@@ -125,7 +129,7 @@ where ss_ticket_number = sr_ticket_number
   and ca_country = 'United States'
   and c_preferred_cust_flag = 'Y'
   and s_zip = ca_zip
-  and s_state in ('CA','TX','NY','WA')
+  and s_state in ('[SSTATE_A]','[SSTATE_B]','[SSTATE_C]')
   and i_units in ('Each','Box','Case')
   and i_color is not null
 group by c_last_name

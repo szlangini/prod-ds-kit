@@ -42,6 +42,7 @@
  define CITY_D = distmember(cities, [CITYNUMBER.4], 1);
  define CITY_E = distmember(cities, [CITYNUMBER.5], 1);
  define _LIMIT=100;
+define BCOUNTRY = ulist(dist(countries, 1, 1), 2);
 select c_last_name
       ,c_first_name
       ,ca_city
@@ -80,7 +81,7 @@ select c_last_name
     where ss_customer_sk = c_customer_sk
       and customer.c_current_addr_sk = current_addr.ca_address_sk
       and current_addr.ca_city <> bought_city
-      and c_birth_country in ('United States','Canada')
+      and c_birth_country in ('[BCOUNTRY.1]','[BCOUNTRY.2]')
       and current_addr.ca_state in ('CA','TX','NY','WA')
   order by c_last_name
           ,c_first_name

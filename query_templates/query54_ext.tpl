@@ -38,6 +38,8 @@
  define CATEGORY = distmember(categories,[CINDX],1);
  define CLASS = dist(distmember(categories,[CINDX],2),1,1); 
  define _LIMIT=100;
+define CACITY = ulist(dist(cities, 1, 6), 3);
+define BCOUNTRY = ulist(dist(countries, 1, 1), 2);
 with my_customers as (
  select distinct c_customer_sk
         , c_current_addr_sk
@@ -61,7 +63,7 @@ with my_customers as (
          and i_class = '[CLASS]'
          and i_brand is not null
          and c_customer_sk = cs_or_ws_sales.customer_sk
-         and c_birth_country in ('United States','Canada')
+         and c_birth_country in ('[BCOUNTRY.1]','[BCOUNTRY.2]')
          and d_year = [YEAR]
  )
  , my_revenue as (
@@ -87,7 +89,7 @@ with my_customers as (
                                  where  d_year = [YEAR]
                                         and d_moy = [MONTH]
                                         and d_month_seq is not null)
-        and ca_city in ('Seattle','Austin','Miami')
+        and ca_city in ('[CACITY.1]','[CACITY.2]','[CACITY.3]')
  group by c_customer_sk
  )
  , segments as

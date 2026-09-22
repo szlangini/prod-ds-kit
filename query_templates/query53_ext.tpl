@@ -35,6 +35,10 @@
 
 define DMS = random(1176,1224,uniform);
 define _LIMIT=100;
+define SCOUNTY = ulist(random(1, rowcount("active_counties", "store"), uniform), 3);
+define SSTATE_A = distmember(fips_county, [SCOUNTY.1], 3);
+define SSTATE_B = distmember(fips_county, [SCOUNTY.2], 3);
+define SSTATE_C = distmember(fips_county, [SCOUNTY.3], 3);
 select * from 
 (select i_manufact_id,
 sum(ss_sales_price) sum_sales,
@@ -58,7 +62,7 @@ or(i_category in ('Women','Music','Men') and
 i_class in ('accessories','classical','fragrances','pants') and
 i_brand in ('amalgimporto #1','edu packscholar #1','exportiimporto #1',
 		'importoamalg #1')))
-and s_state in ('CA','TX','NY','WA')
+and s_state in ('[SSTATE_A]','[SSTATE_B]','[SSTATE_C]')
 and i_brand is not null
 and s_company_name is not null
 group by i_manufact_id, d_qoy ) tmp1

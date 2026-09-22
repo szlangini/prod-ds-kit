@@ -4,10 +4,7 @@
 # Legacy profiles below are preserved for historical reference.
 
 profiles:
-  mcv_fleet_default:
-    # Full eligible coverage; the per-column target (max_value_buckets) decides how
-    # much each column is skewed, so coverage no longer needs to be throttled here.
-    column_selection_fraction: 1.0
+  mcv_fleet_default: &mcv_fleet_default
     selection_fraction_scope: overall
     exclude_tables:
       - date_dim
@@ -65,34 +62,50 @@ profiles:
       - web_sales.ws_ext_sales_price
     # Target distribution of the TOP-1 (max-value) share -- the fraction of total
     # rows the single most-common value occupies. This is exactly what the Redshift
-    # "Maximum MCV frequency" curve measures. Calibrated 2026-06 to the fleet mid-tail
-    # (>=0.30~49, >=0.50~41) while staying deliberately conservative at the extreme
-    # (>=0.70/>=0.90 above the TPC-DS base but well below the fleet, per paper 5.2.6).
-    # Injection reuses each column's natural dominant value and is null-compensated +
-    # monotonic, so these are realized targets over total rows -- not raw cell rates.
+    # "Maximum MCV frequency" curve measures.
+    #
+    # Recalibrated 2026-09-01 together with the join-key skew axis (Profil K):
+    # the query-derived exclusion now covers only LITERAL-FILTERED columns
+    # (query_exclusion_scope: filtered; config/query_filter_columns.txt) so
+    # group-by / order-by / aggregate-input columns are skewable, and the bucket
+    # table is top-heavy because the key axis is capped at 0.80 and the MCV axis
+    # carries the fleet's extreme [0.90, 0.99) mass (payload/group columns do not
+    # conjoin multiplicatively the way fact FKs do). Measured at SF10 with the
+    # default key tier: 79.5/66.2/50.1/45.0/31.9/19.4 vs fleet 73/60/49/41/33/25
+    # (mean |gap| ~4pp, scale-stable SF1..SF10; 107-query gate: 0 errors).
+    query_exclusion_scope: filtered
+    column_selection_fraction: 0.85
     max_value_buckets:
-      - weight: 0.03
+      - weight: 0.04
         min: 0.01
         max: 0.10
       - weight: 0.05
         min: 0.10
         max: 0.30
-      - weight: 0.12
+      - weight: 0.07
         min: 0.30
         max: 0.50
-      - weight: 0.35
+      - weight: 0.09
         min: 0.50
         max: 0.70
-      - weight: 0.25
+      - weight: 0.15
         min: 0.70
         max: 0.90
-      - weight: 0.20
+      - weight: 0.60
         min: 0.90
         max: 0.99
+
+  # Back-compat alias for the calibration runs: identical to the promoted
+  # default above.
+  mcv_fleet_scoped:
+    <<: *mcv_fleet_default
 
   mcv_low:
     column_selection_fraction: 0.45
     selection_fraction_scope: overall
+    # Same role-scoped exclusion as the default tier (literal-filtered columns
+    # stay untouched); only intensity differs.
+    query_exclusion_scope: filtered
     exclude_tables:
       - date_dim
       - time_dim
@@ -168,6 +181,9 @@ profiles:
   mcv_high:
     column_selection_fraction: 1.0
     selection_fraction_scope: overall
+    # Same role-scoped exclusion as the default tier; sits ABOVE the calibrated
+    # medium (stress tier): full coverage and a heavier extreme tail.
+    query_exclusion_scope: filtered
     exclude_tables:
       - date_dim
       - time_dim
@@ -222,25 +238,25 @@ profiles:
       - web_sales.ws_ext_wholesale_cost
       - web_sales.ws_ext_discount_amt
       - web_sales.ws_ext_sales_price
-    # High-skew tier: heavy mass at/above 0.5 and a real extreme tail toward the
-    # production curve (>=0.90 ~ fleet). Use with care -- aggressive max-value
-    # dominance can collapse predicate selectivity (see paper 5.2.6).
+    # High-skew tier: sits above the calibrated medium -- full coverage and an
+    # extreme tail beyond the fleet curve. Use with care: aggressive max-value
+    # dominance stresses selectivity estimation and grouping hard.
     max_value_buckets:
       - weight: 0.01
         min: 0.01
         max: 0.10
-      - weight: 0.03
+      - weight: 0.02
         min: 0.10
         max: 0.30
-      - weight: 0.06
+      - weight: 0.05
         min: 0.30
         max: 0.50
-      - weight: 0.25
+      - weight: 0.07
         min: 0.50
         max: 0.70
-      - weight: 0.30
+      - weight: 0.15
         min: 0.70
         max: 0.90
-      - weight: 0.35
+      - weight: 0.70
         min: 0.90
         max: 0.99

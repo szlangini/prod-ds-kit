@@ -165,6 +165,42 @@ class MCVSkewTests(unittest.TestCase):
                         f"MCV skew should not modify key/NOT NULL column {idx}",
                     )
 
+    def test_saturating_target_keeps_a_retention_floor(self) -> None:
+        # A target above the non-null fraction must NOT collapse the column onto
+        # one value (count(DISTINCT)=1 zeroes aggregate-comparison queries, the
+        # q81 family): f1 is floored so >= MCV_MIN_RETENTION of non-null cells
+        # keep their natural values.
+        cfg = mcv_skew_rules()
+        cfg["min_ndv_for_injection"] = 0
+        injector = stringify.MCVInjector(self.schema, cfg)  # type: ignore[attr-defined]
+        stat = stringify.NaturalColumnStat(value="0.00", share_nn=0.3, null_rate=0.5)  # type: ignore[attr-defined]
+        f1, value = injector._resolve_target(
+            "catalog_returns", "cr_return_amt_inc_tax", "decimal(7,2)",
+            target=0.99, null_frac=0.2, stat=stat,
+        )
+        self.assertEqual(value, "0.00")
+        self.assertLessEqual(f1, 1.0 - stringify.MCV_MIN_RETENTION)  # type: ignore[attr-defined]
+        self.assertGreater(f1, 0.9)
+
+    def test_filtered_exclusion_scope_expands_pool(self) -> None:
+        # The shipped default is scope=filtered; compare against an explicit
+        # "referenced" override to show the widened pool.
+        base_cfg = mcv_skew_rules(overrides={"query_exclusion_scope": "referenced"})
+        base_cfg["min_ndv_for_injection"] = 0
+        referenced = stringify.MCVInjector(self.schema, base_cfg)  # type: ignore[attr-defined]
+        scoped_cfg = mcv_skew_rules()
+        scoped_cfg["min_ndv_for_injection"] = 0
+        filtered = stringify.MCVInjector(self.schema, scoped_cfg)  # type: ignore[attr-defined]
+        n_referenced = sum(len(v) for v in referenced.eligible_columns.values())
+        n_filtered = sum(len(v) for v in filtered.eligible_columns.values())
+        self.assertGreater(n_filtered, n_referenced)
+        # Literal-filtered names must stay excluded in the widened scope too.
+        filter_names = stringify._query_filter_columns()  # type: ignore[attr-defined]
+        self.assertTrue(filter_names)
+        for cols in filtered.eligible_columns.values():
+            for col in cols:
+                self.assertNotIn(col.lower(), filter_names)
+
     def test_mcv_increases_top_counts(self) -> None:
         overrides = {
             "column_selection_fraction": 1.0,
@@ -226,7 +262,7 @@ class MCVTierTests(unittest.TestCase):
 
     TIER_PROFILES = [
         ("mcv_low", 0.45),
-        ("mcv_fleet_default", 1.0),
+        ("mcv_fleet_default", 0.85),
         ("mcv_high", 1.0),
     ]
 

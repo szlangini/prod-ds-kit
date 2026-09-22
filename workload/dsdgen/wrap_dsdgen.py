@@ -147,6 +147,27 @@ def _parse_wrapper_args(argv: Sequence[str]) -> Tuple[argparse.Namespace, List[s
         help="MCV profile name or tier alias (low/medium/high). Default: medium (mcv_fleet_default).",
     )
     parser.add_argument(
+        "--skew-profile",
+        type=str,
+        help="Umbrella skew tier (low/medium/high): applies to ALL skew axes at once "
+        "(NULL sparsity, MCV value skew, join-key skew). Per-axis flags "
+        "(--null-profile/--mcv-profile/--key-skew-profile) override individually.",
+    )
+    parser.add_argument(
+        "--disable-key-skew",
+        action="store_true",
+        help="Skip join-key skew post-processing (enabled by default, like NULL/MCV).",
+    )
+    parser.add_argument(
+        "--key-skew-profile",
+        type=str,
+        help="Join-key skew profile or tier alias (low/medium/high): redirects a "
+        "fleet-calibrated share of fact-table FKs (customer/store/demo/addr/promo/"
+        "warehouse/page; dates stay vanilla in the default tier) to one hot key per "
+        "channel and domain. Default: medium (key_fleet_default).",
+    )
+    parser.add_argument("--key-skew-seed", type=int, help="Deterministic seed for join-key skew.")
+    parser.add_argument(
         "--rewrite-max-workers", type=int, help="Cap worker processes used during rewrite stage."
     )
     parser.add_argument(
@@ -304,11 +325,14 @@ def _run_rewrite(
     strlen: int,
     null_enabled: bool,
     mcv_enabled: bool,
+    key_skew_enabled: bool = False,
     null_marker: Optional[str] = None,
     null_seed: Optional[int] = None,
     null_profile: Optional[str] = None,
     mcv_seed: Optional[int] = None,
     mcv_profile: Optional[str] = None,
+    key_skew_seed: Optional[int] = None,
+    key_skew_profile: Optional[str] = None,
     include_hot_paths: Optional[bool] = None,
     min_ndv_for_injection: Optional[int] = None,
     ndv_reference_duckdb: Optional[str] = None,
@@ -352,6 +376,9 @@ def _run_rewrite(
         enable_mcv=mcv_enabled,
         mcv_seed=mcv_seed,
         mcv_profile=mcv_profile,
+        enable_key_skew=key_skew_enabled,
+        key_skew_seed=key_skew_seed,
+        key_skew_profile=key_skew_profile,
     )
     print(f"[rewrite] Rewrote {files} data files ({rows} rows).")
 
@@ -383,7 +410,17 @@ def main(argv: Sequence[str]) -> int:
         has_force = any(t.upper() in ("-FORCE", "--FORCE") for t in passthrough)
         if not has_force:
             passthrough = passthrough + ["-FORCE"]
-        print("[default] Using recommended defaults: STR=5, STRLEN=0, NULL=medium, MCV=medium, SF=10, DIR=./output")
+        print("[default] Using recommended defaults: STR=5, STRLEN=0, NULL=medium, MCV=medium, KEY=medium, SF=10, DIR=./output")
+
+    # Umbrella tier: one profile name fans out to every skew axis unless an
+    # axis-specific flag was given.
+    if parsed.skew_profile is not None:
+        if parsed.null_profile is None:
+            parsed.null_profile = parsed.skew_profile
+        if parsed.mcv_profile is None:
+            parsed.mcv_profile = parsed.skew_profile
+        if parsed.key_skew_profile is None:
+            parsed.key_skew_profile = parsed.skew_profile
 
     stringify_level = parsed.stringification_level
     stringify_preset = parsed.stringification_preset
@@ -402,10 +439,11 @@ def main(argv: Sequence[str]) -> int:
     stringify_requested = resolved_level > 1
     null_skew_enabled = not bool(parsed.disable_null_skew)
     mcv_skew_enabled = not bool(parsed.disable_mcv_skew)
+    key_skew_enabled = not bool(parsed.disable_key_skew)
 
     dir_path, normalized_args = _normalize_dir_args(
         list(passthrough),
-        stringify_requested or null_skew_enabled or mcv_skew_enabled,
+        stringify_requested or null_skew_enabled or mcv_skew_enabled or key_skew_enabled,
         default_dir=TOOLS_DIR,
     )
     passthrough = normalized_args
@@ -426,12 +464,14 @@ def main(argv: Sequence[str]) -> int:
     if rc != 0:
         return rc
 
-    if stringify_requested or null_skew_enabled or mcv_skew_enabled:
+    if stringify_requested or null_skew_enabled or mcv_skew_enabled or key_skew_enabled:
         print(
             f"[stringify] Stringification level {resolved_level} (preset={resolved_preset or 'custom'})."
         )
 
-    if (stringify_requested or null_skew_enabled or mcv_skew_enabled) and dir_path is not None:
+    if (
+        stringify_requested or null_skew_enabled or mcv_skew_enabled or key_skew_enabled
+    ) and dir_path is not None:
         _run_rewrite(
             dir_path,
             stringification_level=resolved_level,
@@ -444,6 +484,7 @@ def main(argv: Sequence[str]) -> int:
             strlen=int(parsed.strlen),
             null_enabled=null_skew_enabled,
             mcv_enabled=mcv_skew_enabled,
+            key_skew_enabled=key_skew_enabled,
             null_marker=parsed.null_marker,
             null_seed=parsed.null_seed,
             null_profile=parsed.null_profile,
@@ -454,6 +495,8 @@ def main(argv: Sequence[str]) -> int:
             scale_factor=parsed.scale_factor,
             mcv_seed=parsed.mcv_seed,
             mcv_profile=parsed.mcv_profile,
+            key_skew_seed=parsed.key_skew_seed,
+            key_skew_profile=parsed.key_skew_profile,
             max_workers=parsed.rewrite_max_workers,
         )
 

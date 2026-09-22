@@ -42,8 +42,8 @@ WARMUP=1
 TIMEOUT=1800
 THREADS=""  # auto-detect
 PRODDS_STR="${PRODDS_STR:-5}"            # Default Prod-DS STR level (type coverage; 5 = production optimum, was 10 pre-revision)
-E4_LEVELS="${E4_LEVELS:-$(seq 1 10)}"    # E4 STR type-coverage sweep (1-10)
-E4_STRLEN_LEVELS="${E4_STRLEN_LEVELS:-2 4}"  # E4 STRLEN length add-on at STR=$PRODDS_STR (DuckDB only; set "" to disable)
+E4_LEVELS="${E4_LEVELS-$(seq 1 10)}"    # E4 STR type-coverage sweep (1-10)
+E4_STRLEN_LEVELS="${E4_STRLEN_LEVELS-2 4}"  # E4 STRLEN length add-on at STR=$PRODDS_STR (DuckDB only; set "" to disable)
 
 # Engine versions (matching paper Section 6.1–6.2) — pinned for reproducibility
 DUCKDB_VERSION="${DUCKDB_VERSION:-1.4.4}"
@@ -97,8 +97,8 @@ parse_args() {
     # Validate experiment names
     for e in $EXPERIMENTS; do
         case "$e" in
-            E1|E2|E3|E4|E5|E4X) ;;
-            *) fail "Unknown experiment: $e (valid: E1 E2 E3 E4 E5 E4X)" ;;
+            E0|E1|E2|E3|E4|E5|E4X) ;;
+            *) fail "Unknown experiment: $e (valid: E0 E1 E2 E3 E4 E5 E4X)" ;;
         esac
     done
 
@@ -120,7 +120,9 @@ queries_dir() { echo "$WORK_DIR/sf${SF}/queries/$1"; }
 db_dir()      { echo "$WORK_DIR/sf${SF}/databases"; }
 engines_dir() { echo "$WORK_DIR/engines"; }
 configs_dir() { echo "$WORK_DIR/sf${SF}/configs"; }
-results_dir() { echo "$WORK_DIR/sf${SF}/results"; }
+# RESULTS_TAG=<name> writes into results_<name>/ so a measurement campaign
+# (e.g. the key-skew revision) never mixes with earlier runs in results/.
+results_dir() { echo "$WORK_DIR/sf${SF}/results${RESULTS_TAG:+_$RESULTS_TAG}"; }
 
 activate_venv() {
     if [ -f "$VENV_DIR/bin/activate" ]; then
@@ -355,6 +357,10 @@ generate_data_variant() {
         -SCALE "$SF"
         -DIR "$out_dir"
     )
+    # Default Prod-DS data now includes the calibrated join-key skew axis
+    # (key_fleet_default) alongside NULL/MCV. Variants that must isolate axes
+    # (TPC-DS vanilla, the E5 sparsity/skew arms) pass --disable-key-skew
+    # explicitly below. Pre-recalibration data dirs are preserved as *_preK.
     # Parallelise dsdgen across cores (chunks merged back to <table>.dat inside the wrapper).
     # DSDGEN_PARALLEL=1 restores the single-threaded path.
     local _par="${DSDGEN_PARALLEL:-48}"
@@ -370,7 +376,7 @@ generate_all_data() {
     activate_venv
 
     # TPC-DS vanilla (used by E1)
-    generate_data_variant "$(data_dir tpcds_sf${SF})" 1 --disable-null-skew --disable-mcv-skew
+    generate_data_variant "$(data_dir tpcds_sf${SF})" 1 --disable-null-skew --disable-mcv-skew --disable-key-skew
 
     # Prod-DS default STR=$PRODDS_STR (5 = production optimum; used by E1, E2, E3)
     generate_data_variant "$(data_dir prodds_sf${SF}_str${PRODDS_STR})" "$PRODDS_STR"
@@ -404,17 +410,35 @@ generate_all_data() {
             nullprof=(--null-profile "$e5tier"); mcvprof=(--mcv-profile "$e5tier")
             bothprof=(--mcv-profile "$e5tier" --null-profile "$e5tier")
         fi
-        generate_data_variant "$(data_dir sparsity/baseline${e5tag})" "$PRODDS_STR" --disable-null-skew --disable-mcv-skew
-        generate_data_variant "$(data_dir sparsity/sparsity_only${e5tag})" "$PRODDS_STR" --disable-mcv-skew "${nullprof[@]}"
-        generate_data_variant "$(data_dir sparsity/skew_only${e5tag})" "$PRODDS_STR" --disable-null-skew "${mcvprof[@]}"
+        # E5 arms isolate one axis each (NULL sparsity, MCV skew, join-key skew);
+        # combined = NULL + MCV (the paper's Table 5 decomposition), full = all
+        # three axes = the Prod-DS default; skew_all = MCV + key skew with NULL off
+        # (the joint "skew" row of the paper table: value and key skew are one axis,
+        # split only by mechanism). Key skew stays off in the single-axis
+        # NULL/MCV arms and in combined so the decomposition stays additive.
+        local keyprof=() fullprof=() skewprof=()
+        if [ "$e5tier" != "medium" ]; then
+            keyprof=(--key-skew-profile "$e5tier")
+            skewprof=(--mcv-profile "$e5tier" --key-skew-profile "$e5tier")
+            fullprof=(--mcv-profile "$e5tier" --null-profile "$e5tier" --key-skew-profile "$e5tier")
+        fi
+        generate_data_variant "$(data_dir sparsity/baseline${e5tag})" "$PRODDS_STR" --disable-null-skew --disable-mcv-skew --disable-key-skew
+        generate_data_variant "$(data_dir sparsity/sparsity_only${e5tag})" "$PRODDS_STR" --disable-mcv-skew --disable-key-skew "${nullprof[@]}"
+        generate_data_variant "$(data_dir sparsity/skew_only${e5tag})" "$PRODDS_STR" --disable-null-skew --disable-key-skew "${mcvprof[@]}"
+        generate_data_variant "$(data_dir sparsity/keyskew_only${e5tag})" "$PRODDS_STR" --disable-null-skew --disable-mcv-skew "${keyprof[@]}"
+        generate_data_variant "$(data_dir sparsity/skew_all${e5tag})" "$PRODDS_STR" --disable-null-skew "${skewprof[@]}"
+        if [ -L "$(data_dir sparsity/combined${e5tag})" ]; then
+            rm "$(data_dir sparsity/combined${e5tag})"
+        fi
+        generate_data_variant "$(data_dir sparsity/combined${e5tag})" "$PRODDS_STR" --disable-key-skew "${bothprof[@]}"
+        # full (all axes) at the default tier IS the canonical Prod-DS variant:
+        # link instead of regenerating ~100 GB of identical data.
         if [ "$e5tier" = "medium" ]; then
-            # Combined == default Prod-DS (medium): symlink as before.
-            if [ ! -d "$(data_dir sparsity/combined)" ]; then
-                ln -sfn "$(data_dir prodds_sf${SF}_str${PRODDS_STR})" "$(data_dir sparsity/combined)"
+            if [ ! -e "$(data_dir sparsity/full)" ]; then
+                ln -s "$(data_dir prodds_sf${SF}_str${PRODDS_STR})" "$(data_dir sparsity/full)"
             fi
         else
-            # Combined at a non-default tier: generate explicitly with both skews at that tier.
-            generate_data_variant "$(data_dir sparsity/combined${e5tag})" "$PRODDS_STR" "${bothprof[@]}"
+            generate_data_variant "$(data_dir sparsity/full${e5tag})" "$PRODDS_STR" "${fullprof[@]}"
         fi
     fi
 }
@@ -446,19 +470,8 @@ generate_queries_variant() {
         ok "Queries generated at $out_dir"
     fi
 
-    # E5/E4 workloads must NOT include the E2/E3 scaling micro-suites: drop the
-    # join-generator micro-suite entirely (standard-suite joins stay as query_*.sql)
-    # and cap the union micro-suite at U200 (remove U256..U2048). Runs on both the
-    # generate and skip paths, so it is robust to --init reuse. Gated by env flag.
-    if [ "${WORKLOAD_DROP_MICROSUITE:-0}" = 1 ]; then
-        rm -f "$out_dir"/query_join_J*.sql
-        local _uf _un
-        for _uf in "$out_dir"/query_union_U*.sql; do
-            [ -e "$_uf" ] || continue
-            _un=$(basename "$_uf" | sed -E 's/.*_U([0-9]+)\.sql$/\1/')
-            if [ "$_un" -gt 200 ] 2>/dev/null; then rm -f "$_uf"; fi
-        done
-    fi
+    # The E2/E3 micro-suite (J*, U>200) is dropped per run by prepare_run_queries
+    # (WORKLOAD_DROP_MICROSUITE=1); the canonical directory is never modified.
 }
 
 generate_all_queries() {
@@ -624,7 +637,13 @@ apply_dialect_fixes() {
     # file maps template_num → query_position for correct overlay.
     local overlay_count=0
     local variant_dir="$ROOT_DIR/experiments/queries/dialect_variants/$engine/$suite"
-    if [ -d "$variant_dir" ]; then
+    # LEGACY, off by default (DIALECT_OVERLAYS=1 re-enables): the overlay files were
+    # authored in March 2026 with the parameters/LIMITs of that generator state, so
+    # copying them over a freshly generated set silently replaces up to 41 Prod-DS and
+    # 71 TPC-DS queries with stale variants and breaks the one-query-set-for-all-engines
+    # rule. The generated queries (dsqgen + _ext templates + wrap_dsqgen dialect
+    # fixers) are the measured set; the regex fixes below still apply.
+    if [ "${DIALECT_OVERLAYS:-0}" = "1" ] && [ -d "$variant_dir" ]; then
         local perm_file="$query_dir/_permutation.json"
         for variant in "$variant_dir"/query_*.sql; do
             [ -f "$variant" ] || continue
@@ -716,6 +735,34 @@ apply_dialect_fixes() {
                     fix_count=$((fix_count + 1))
                 fi
             done
+
+            # Parameter-neutral MonetDB dialect rules (replace the March overlays):
+            #  * reserved words used as column aliases by the TPC-DS templates
+            #    (`returns`, `year`) -> `returns_`, `yr` (table names such as
+            #    store_returns and identifiers like d_year/year_total are untouched)
+            #  * date + <n> arithmetic -> date + interval '<n>' day
+            #  * regexp_replace(..., 'g'): MonetDB rejects the flag argument
+            #  * union micro-suite: CTE chains are inlined into plain UNION ALL branches
+            #    (MonetDB's CTE handling), exactly as the E3 union ladder is prepared.
+            for f in "$query_dir"/query_*.sql; do
+                [ -f "$f" ] || continue
+                if grep -qiE "\b(returns|year)\b" "$f" 2>/dev/null; then
+                    sed -i -E 's/\breturns\b/returns_/gI; s/\byear\b/yr/gI' "$f"
+                    fix_count=$((fix_count + 1))
+                fi
+                if grep -qE "(d_date|as date\))\s*\+\s*[0-9]+\b" "$f" 2>/dev/null; then
+                    sed -i -E "s/(d_date|as date\))\s*\+\s*([0-9]+)\b/\1 + interval '\2' day/g" "$f"
+                    fix_count=$((fix_count + 1))
+                fi
+                if grep -q ", 'g')" "$f" 2>/dev/null; then
+                    sed -i "s/, 'g')/)/g" "$f"
+                    fix_count=$((fix_count + 1))
+                fi
+            done
+            if ls "$query_dir"/query_union_U*.sql >/dev/null 2>&1; then
+                monetdb_inline_union_ctes "$query_dir" "$query_dir" >/dev/null
+                fix_count=$((fix_count + 1))
+            fi
             ;;
         cedardb)
             # CedarDB does not support CTE materialization hints
@@ -754,20 +801,30 @@ load_duckdb_database() {
     local data_dir="$2"
     local str_level="${3:-10}"
 
+    # A completed load leaves a "<db>.loaded" marker. A database file without it is an
+    # interrupted load (killed run, full disk) and is rebuilt instead of silently reused.
     if [ -f "$db_path" ]; then
-        info "DuckDB database already exists: $db_path — skipping load."
-        return
+        if [ -f "$db_path.loaded" ]; then
+            info "DuckDB database already exists: $db_path — skipping load."
+            return
+        fi
+        warn "DuckDB database $db_path has no completion marker (interrupted load?) — rebuilding."
+        rm -f "$db_path" "$db_path.wal"
     fi
 
     mkdir -p "$(dirname "$db_path")"
     info "Loading data into DuckDB: $db_path"
 
-    DUCKDB_BIN="$(duckdb_bin)" \
-    DUCKDB_PATH="$db_path" \
-    DATA_DIR="$data_dir" \
-    STR="$str_level" \
-    DUCKDB_ALLOW_OVERWRITE=1 \
-        bash "$ROOT_DIR/experiments/scripts/load_duckdb.sh"
+    if DUCKDB_BIN="$(duckdb_bin)" \
+       DUCKDB_PATH="$db_path" \
+       DATA_DIR="$data_dir" \
+       STR="$str_level" \
+       DUCKDB_ALLOW_OVERWRITE=1 \
+        bash "$ROOT_DIR/experiments/scripts/load_duckdb.sh"; then
+        touch "$db_path.loaded"
+    else
+        fail "DuckDB load failed: $db_path"
+    fi
 
     ok "DuckDB loaded: $db_path"
 }
@@ -938,13 +995,23 @@ load_engine_data() {
             local db_dir_cedar
             db_dir_cedar="$(db_dir)/cedardb/${db_label}"
             start_cedardb "$db_dir_cedar"
-            load_cedardb_database "$data_dir" "$str_level" "$db_label"
+            if [ -f "$db_dir_cedar/.loaded" ]; then
+                info "CedarDB database already loaded: $db_label — skipping load."
+            else
+                load_cedardb_database "$data_dir" "$str_level" "$db_label"
+                touch "$db_dir_cedar/.loaded"
+            fi
             ;;
         monetdb)
             local farm_path
             farm_path="$(db_dir)/monetdb/farm"
             start_monetdb "$farm_path"
-            load_monetdb_database "$data_dir" "$str_level" "$db_label"
+            if [ -f "$farm_path/.loaded_${db_label}" ]; then
+                info "MonetDB database already loaded: $db_label — skipping load."
+            else
+                load_monetdb_database "$data_dir" "$str_level" "$db_label"
+                touch "$farm_path/.loaded_${db_label}"
+            fi
             ;;
         postgres)
             # System server already running; load creates the db_label database in it.
@@ -1081,6 +1148,105 @@ run_workload_on_engine() {
         --system "$engine" || warn "$engine run had errors."
 }
 
+# ── Protocol step 1: audit pass + common subset ───────────────────────────
+# prepare_run_queries <engine> <suite>: sets RUN_QDIR to the query directory an
+# experiment runs. For the tpcds/prodds suites, $(results_dir)/common_subset.json
+# (written by the E0 audit; override with COMMON_SUBSET_JSON) restricts a per-run
+# copy to the suite's common subset; with WORKLOAD_DROP_MICROSUITE=1 the E2/E3
+# micro-suite (J*, U>200) is dropped from the copy. The canonical generated
+# directory is never modified.
+RUN_QDIR=""
+prepare_run_queries() {
+    local engine="$1" suite="$2"
+    local src; src="$(queries_dir ${engine}/${suite})"
+    local cs="${COMMON_SUBSET_JSON:-$(results_dir)/common_subset.json}"
+    local suite_key=""
+    case "$suite" in tpcds|prodds) suite_key="$suite" ;; esac
+    RUN_QDIR="$src"
+    if { [ -z "$suite_key" ] || [ ! -f "$cs" ]; } && [ "${WORKLOAD_DROP_MICROSUITE:-0}" != 1 ]; then
+        return 0
+    fi
+    local dst; dst="$(queries_dir ${engine}/${suite}_run)"
+    rm -rf "$dst"; mkdir -p "$dst"
+    cp -a "$src"/. "$dst"/
+    if [ -n "$suite_key" ] && [ -f "$cs" ]; then
+        local kept
+        kept=$(python3 - "$cs" "$suite_key" "$dst" <<'PYEOF2'
+import json, sys, os
+cs, suite, dst = sys.argv[1], sys.argv[2], sys.argv[3]
+spec = (json.load(open(cs)).get("suites") or {}).get(suite)
+if spec and spec.get("common") is not None:
+    keep = set(spec["common"]); removed = 0
+    for f in os.listdir(dst):
+        if f.startswith("query_") and f.endswith(".sql") and f[:-4] not in keep:
+            os.remove(os.path.join(dst, f)); removed += 1
+    print(f"{len(keep)} common queries ({removed} removed)")
+else:
+    print("no entry in the subset file, full set kept")
+PYEOF2
+)
+        info "Run queries for ${engine}/${suite}: ${kept} [$cs]"
+    fi
+    if [ "${WORKLOAD_DROP_MICROSUITE:-0}" = 1 ]; then
+        rm -f "$dst"/query_join_J*.sql
+        local _uf _un
+        for _uf in "$dst"/query_union_U*.sql; do
+            [ -e "$_uf" ] || continue
+            _un=$(basename "$_uf" | sed -E 's/.*_U([0-9]+)\.sql$/\1/')
+            if [ "$_un" -gt 200 ] 2>/dev/null; then rm -f "$_uf"; fi
+        done
+    fi
+    RUN_QDIR="$dst"
+}
+
+# E0: audit pass -- every query of both suites once, untimed (REPS=1, WARMUP=0),
+# on every requested engine, then the common subset across all engines audited so
+# far is (re)computed into $(results_dir)/common_subset.json. E1/E5 then run only
+# that subset (docs/experimental-protocol.md, "E1 -- Audit"). Loaded databases are
+# kept for the timed runs (KEEP_ENGINE_DBS=1 keeps CedarDB's TPC-DS instance too).
+run_e0() {
+    step "E0: Audit pass (one untimed run per query) -> common subset"
+    activate_venv
+    local exp_results
+    exp_results="$(results_dir)/E0"
+    local empty_dir="$(configs_dir)/empty_queries"
+    mkdir -p "$exp_results" "$empty_dir"
+    local saved_reps="$REPS" saved_warmup="$WARMUP"
+    REPS=1; WARMUP=0
+    IFS=',' read -ra engine_list <<< "$ENGINES"
+    for engine in "${engine_list[@]}"; do
+        if ! engine_available "$engine"; then
+            warn "E0: $engine not available, skipping."
+            continue
+        fi
+        info "E0/$engine: auditing TPC-DS..."
+        load_engine_data "$engine" "$(data_dir tpcds_sf${SF})" 1 "tpcds_sf${SF}"
+        run_workload_on_engine "$engine" \
+            "$(queries_dir ${engine}/tpcds)" "$empty_dir" \
+            "$exp_results/${engine}_tpcds" "tpcds_sf${SF}"
+        if [ "$engine" = "cedardb" ]; then
+            stop_cedardb
+            [ "${KEEP_ENGINE_DBS:-0}" = 1 ] || rm -rf "$(db_dir)/cedardb/tpcds_sf${SF}"
+        fi
+        info "E0/$engine: auditing Prod-DS..."
+        load_engine_data "$engine" "$(data_dir prodds_sf${SF}_str${PRODDS_STR})" "$PRODDS_STR" "prodds_sf${SF}_str${PRODDS_STR}"
+        run_workload_on_engine "$engine" \
+            "$empty_dir" "$(queries_dir ${engine}/prodds)" \
+            "$exp_results/${engine}_prodds" "prodds_sf${SF}_str${PRODDS_STR}"
+        case "$engine" in
+            cedardb) stop_cedardb ;;
+            monetdb) stop_monetdb ;;
+        esac
+    done
+    REPS="$saved_reps"; WARMUP="$saved_warmup"
+    if python3 "$ROOT_DIR/experiments/common_subset.py" --results-dir "$(results_dir)" \
+            --experiment E0 --timeout-s "$TIMEOUT"; then
+        ok "E0 complete. Common subset -> $(results_dir)/common_subset.json"
+    else
+        warn "E0: common subset computation failed (see above)."
+    fi
+}
+
 run_e1() {
     step "E1: End-to-end TPC-DS vs Prod-DS (Section 6.5)"
     activate_venv
@@ -1098,11 +1264,15 @@ run_e1() {
         fi
         info "Running E1 on $engine..."
 
+        # E1_ARMS (default "tpcds,prodds") selects the arms: a campaign that only
+        # changed Prod-DS sets E1_ARMS=prodds and keeps its earlier TPC-DS arm.
+        if echo ",${E1_ARMS:-tpcds,prodds}," | grep -q ",tpcds,"; then
         # --- TPC-DS side: load then run (interleaved so only one dataset is resident) ---
         load_engine_data "$engine" "$(data_dir tpcds_sf${SF})" 1 "tpcds_sf${SF}"
         info "E1/$engine: Running TPC-DS workload..."
+        prepare_run_queries "$engine" tpcds
         run_workload_on_engine "$engine" \
-            "$(queries_dir ${engine}/tpcds)" "$empty_dir" \
+            "$RUN_QDIR" "$empty_dir" \
             "$exp_results/${engine}_tpcds" "tpcds_sf${SF}"
 
         # CedarDB Community Edition enforces a 64 GiB per-INSTANCE data cap. tpcds_sf100 (53G)
@@ -1112,14 +1282,20 @@ run_e1() {
         # per-label data dir. Engines without the cap need no teardown, so gate on cedardb.
         if [ "$engine" = "cedardb" ]; then
             stop_cedardb
-            rm -rf "$(db_dir)/cedardb/tpcds_sf${SF}"
+            [ "${KEEP_ENGINE_DBS:-0}" = 1 ] || rm -rf "$(db_dir)/cedardb/tpcds_sf${SF}"
+        fi
+        fi  # tpcds arm
+        if ! echo ",${E1_ARMS:-tpcds,prodds}," | grep -q ",prodds,"; then
+            info "E1/$engine: Prod-DS arm not in E1_ARMS -> skipped."
+            continue
         fi
 
         # --- Prod-DS side: load then run ---
         load_engine_data "$engine" "$(data_dir prodds_sf${SF}_str${PRODDS_STR})" "$PRODDS_STR" "prodds_sf${SF}_str${PRODDS_STR}"
         info "E1/$engine: Running Prod-DS workload..."
+        prepare_run_queries "$engine" prodds
         run_workload_on_engine "$engine" \
-            "$empty_dir" "$(queries_dir ${engine}/prodds)" \
+            "$empty_dir" "$RUN_QDIR" \
             "$exp_results/${engine}_prodds" "prodds_sf${SF}_str${PRODDS_STR}"
 
         # Stop server engines between engines (isolation)
@@ -1216,8 +1392,9 @@ run_e4() {
 
         load_engine_data "duckdb" "$(data_dir str_sweep/str${str})" "$str" "str_sweep_sf${SF}_str${str}"
 
+        prepare_run_queries duckdb "str_sweep/str${str}"
         run_workload_on_engine "duckdb" \
-            "$empty_dir" "$(queries_dir duckdb/str_sweep/str${str})" \
+            "$empty_dir" "$RUN_QDIR" \
             "$exp_results/str${str}" "str_sweep_sf${SF}_str${str}"
     done
 
@@ -1228,8 +1405,9 @@ run_e4() {
 
         load_engine_data "duckdb" "$(data_dir str_sweep/${lbl})" "$PRODDS_STR" "str_sweep_sf${SF}_${lbl}"
 
+        prepare_run_queries duckdb "str_sweep/${lbl}"
         run_workload_on_engine "duckdb" \
-            "$empty_dir" "$(queries_dir duckdb/str_sweep/${lbl})" \
+            "$empty_dir" "$RUN_QDIR" \
             "$exp_results/${lbl}" "str_sweep_sf${SF}_${lbl}"
     done
 
@@ -1252,8 +1430,9 @@ run_e4x() {
         for str in $E4_LEVELS; do
             info "E4X/$engine: STR=$str"
             load_engine_data "$engine" "$(data_dir str_sweep/str${str})" "$str" "str_sweep_sf${SF}_str${str}"
+            prepare_run_queries "$engine" "str_sweep/str${str}"
             run_workload_on_engine "$engine" \
-                "$empty_dir" "$(queries_dir ${engine}/str_sweep/str${str})" \
+                "$empty_dir" "$RUN_QDIR" \
                 "$exp_results/${engine}_str${str}" "str_sweep_sf${SF}_str${str}"
         done
         case "$engine" in cedardb) stop_cedardb ;; monetdb) stop_monetdb ;; esac
@@ -1274,7 +1453,9 @@ run_e5() {
     local empty_dir="$(configs_dir)/empty_queries"
     mkdir -p "$exp_results" "$empty_dir"
 
-    local variants=("baseline" "sparsity_only" "skew_only" "combined")
+    # baseline / one axis each (NULL, MCV, join-key skew) / NULL+MCV (paper's
+    # "combined") / all three axes (= Prod-DS default).
+    local variants=("baseline" "sparsity_only" "skew_only" "keyskew_only" "skew_all" "combined" "full")
 
     # E5 runs on whatever --engines requested (was duckdb/cedardb-only per paper; generalized
     # so MonetDB / PostgreSQL can be measured too).
@@ -1303,20 +1484,26 @@ run_e5() {
             local db_label="sparsity_sf${SF}_${variant}${e5tag}"
             load_engine_data "$engine" "$(data_dir sparsity/${variant}${e5tag})" "$PRODDS_STR" "$db_label"
 
+            prepare_run_queries "$engine" prodds
             run_workload_on_engine "$engine" \
-                "$empty_dir" "$(queries_dir ${engine}/prodds)" \
+                "$empty_dir" "$RUN_QDIR" \
                 "$exp_results/${variant}_${engine}" "$db_label"
 
             case "$engine" in
                 cedardb) stop_cedardb ;;
+                monetdb) stop_monetdb ;;
             esac
 
-            # Free the just-measured DuckDB variant DB. E5 loads up to 4 variants;
-            # at SF100 (~60 GB each) keeping them all would exhaust disk. The DB is a
-            # throwaway load of the variant data (which is kept), so this is safe.
-            if [ "$engine" = "duckdb" ]; then
-                rm -f "$(db_dir)/duckdb/${db_label}.duckdb"
-            fi
+            # Free the just-measured variant database on every engine. E5 loads up to
+            # 6 variants; at SF100 (DuckDB ~60 GB, CedarDB ~50 GB, MonetDB ~100 GB each)
+            # keeping them all would exhaust disk. The database is a throwaway load of
+            # the variant data (which is kept), so this is safe; the completion marker
+            # goes with it.
+            case "$engine" in
+                duckdb)  rm -f "$(db_dir)/duckdb/${db_label}.duckdb" "$(db_dir)/duckdb/${db_label}.duckdb.loaded" ;;
+                cedardb) rm -rf "$(db_dir)/cedardb/${db_label}" ;;
+                monetdb) rm -rf "$(db_dir)/monetdb/farm/${db_label}" "$(db_dir)/monetdb/farm/.loaded_${db_label}" ;;
+            esac
         done
     done
 
@@ -1423,6 +1610,7 @@ main() {
 
     for exp in $EXPERIMENTS; do
         case "$exp" in
+            E0) run_e0 ;;
             E1) run_e1 ;;
             E2) run_e2 ;;
             E3) run_e3 ;;

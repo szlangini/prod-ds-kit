@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import re
 import sys
 from collections import defaultdict
@@ -54,23 +55,39 @@ SUITE_LABELS = {
 }
 
 # Error categories shown in Fig 10
-ERROR_CATEGORIES = ["success", "error", "timeout_planning", "timeout_execution",
-                    "oom", "engine_crash"]
+# Same taxonomy as the Table 4 CSV (export_paper_csv.py), so figure and table agree.
+ERROR_CATEGORIES = ["success", "dialect", "failure", "oom", "timeout"]
 ERROR_COLORS = {
-    "success":           "#4CAF50",
+    "success": "#4CAF50",
+    "dialect": "#F44336",
+    "failure": "#795548",
+    "oom":     "#9C27B0",
+    "timeout": "#FF9800",
+    # legacy runner statuses, kept so the fallback path below still renders
     "error":             "#F44336",
     "timeout_planning":  "#FF9800",
     "timeout_execution": "#FFC107",
-    "oom":               "#9C27B0",
     "engine_crash":      "#795548",
 }
 ERROR_LABELS = {
-    "success":           "Success",
+    "success": "Success",
+    "dialect": "Unsupported SQL / dialect",
+    "failure": "Other failure",
+    "oom":     "Out of memory",
+    "timeout": "Timeout",
     "error":             "Error",
     "timeout_planning":  "Plan Timeout",
     "timeout_execution": "Exec Timeout",
-    "oom":               "OOM",
     "engine_crash":      "Crash",
+}
+CAUSE_TO_CATEGORY = {
+    "syntax / dialect": "dialect",
+    "unsupported SQL feature": "dialect",
+    "out of memory": "oom",
+    "timeout": "timeout",
+    "engine crash": "failure",
+    "engine resource limit": "failure",
+    "other error": "failure",
 }
 
 
@@ -116,8 +133,8 @@ def _summarize_records(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         total = len(items)
         successes = [i for i in items if i.get("status") == "success"]
         success_times = [
-            i["wall_time_ms_total"] for i in successes
-            if i.get("wall_time_ms_total") is not None
+            i[RAW_TIME_FIELD] for i in successes
+            if i.get(RAW_TIME_FIELD) is not None
         ]
         planning_times = [
             i["wall_time_ms_planning"] for i in successes
@@ -135,7 +152,7 @@ def _summarize_records(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             "runs_success": len(successes),
             "runs_failed": total - len(successes),
             "failure_rate": (total - len(successes)) / total if total else 0,
-            "median_ms": float(np.median(success_times)) if success_times else None,
+            SUMMARY_TIME_COL: float(np.median(success_times)) if success_times else None,
             "min_ms": min(success_times) if success_times else None,
             "max_ms": max(success_times) if success_times else None,
             "median_planning_ms": float(np.median(planning_times)) if planning_times else None,
@@ -158,6 +175,91 @@ HEIGHT_SCALE = 0.8
 # MonetDB join planning isn't in the harness raw (adapter skipped the EXPLAIN stage); a separate
 # plan-only probe writes this {level: planning_ms} JSON, overlaid as MonetDB's planning line in fig11.
 _MONET_JOIN_PLANNING_JSON = Path(__file__).resolve().parent / "monet_join_planning.json"
+
+
+# ── Figure titles ───────────────────────────────────────────────
+# Reviewer D3(d) of the July 2026 round: "All plots have a header, presumably
+# from the plotting tool, *and* caption, presumably from the LaTeX (sub)figure,
+# and the two say almost the same thing. Remove the header and make the caption
+# more complete if the additional information is useful."
+#
+# Titles are therefore OFF by default. Set PLOT_TITLES=1 in the environment (it
+# is honoured by every generator in this repo and by the WorkloadLens paper
+# figures) or pass --titles to a single generator to restore them for slides and
+# for eyeballing intermediate results.
+# ── Runtime measure (author decision, 17 September 2026) ─────────────────────
+# Every measured value is TWO client processes: one running `EXPLAIN <query>` and one running the
+# query. `wall_time_ms_total` is their sum, which is what every figure used until now.
+#
+# The approved measure for E1-E5 is the EXECUTION CLIENT ALONE. Client startup, connection or
+# database opening, parse, optimisation, execution and output handling inside that client all
+# remain included -- this is NOT engine-internal execution time. The separately executed EXPLAIN
+# client is excluded.
+#
+# RUNTIME_MEASURE=total restores the historical EXPLAIN-plus-execution figures.
+_MEASURE = os.environ.get("RUNTIME_MEASURE", "execution").strip().lower()
+if _MEASURE not in ("execution", "total"):
+    raise SystemExit(f"RUNTIME_MEASURE must be 'execution' or 'total', got {_MEASURE!r}")
+RAW_TIME_FIELD = "wall_time_ms_execution" if _MEASURE == "execution" else "wall_time_ms_total"
+SUMMARY_TIME_COL = "median_execution_ms" if _MEASURE == "execution" else "median_ms"
+MEASURE_LABEL = ("execution client only" if _MEASURE == "execution"
+                 else "EXPLAIN client + execution client (historical)")
+# Ordinate for the per-query time plots. Under either measure this is a CLIENT wall time, so it
+# is never labelled "end-to-end runtime" or "execution time" without saying which client.
+CLIENT_TIME_YLABEL = ("Median execution-client wall time (s)" if _MEASURE == "execution"
+                      else "Median EXPLAIN+execution client wall time (s)")
+# Same quantity, short enough to sit in a column-width panel without losing its unit. Which
+# client is timed still has to be said; "wall time" is the part that can go.
+CLIENT_TIME_YLABEL_SHORT = ("Execution-client time (s)" if _MEASURE == "execution"
+                            else "EXPLAIN+execution client time (s)")
+# The two ladder panels (Fig 11, Fig 12) carry ONE shared ordinate, at the author's direction:
+# the same quantity is drawn in both, so the same words name it. This is a display title and
+# nothing more. It does not redefine what is measured -- Fig 12's series and Fig 11's solid series
+# are the execution client's `median_execution_ms`, Fig 11's dashed series is the separately
+# executed EXPLAIN client, and the shared title neither turns EXPLAIN wall time into isolated
+# optimiser time nor restores the historical sum of the two clients. The timer boundaries live in
+# docs/08-measurement-contract.md and evidence/timing-boundaries/. RUNTIME_MEASURE still selects
+# what is read (RAW_TIME_FIELD, SUMMARY_TIME_COL); it no longer changes these two words.
+RUNTIME_YLABEL = "Median Query Runtime (s)"
+UNION_YLABEL = RUNTIME_YLABEL
+JOIN_YLABEL = RUNTIME_YLABEL
+# Fig 11 draws two clients on one scale; the key below the curves names which is which.
+JOIN_SERIES_LABELS = ("Execution", "EXPLAIN")
+
+_TRUTHY = {"1", "true", "yes", "on"}
+# PLOT_LEGACY_STYLE=1 renders the figures the way they looked before the July 2026 review
+# round (in-plot titles on). It exists so the same data can be shown in the old and the new
+# style side by side; it is never used for the paper itself.
+LEGACY_STYLE: bool = os.environ.get("PLOT_LEGACY_STYLE", "0").strip().lower() in _TRUTHY
+SHOW_TITLES: bool = LEGACY_STYLE or os.environ.get("PLOT_TITLES", "0").strip().lower() in _TRUTHY
+
+
+def set_titles_enabled(flag: bool) -> None:
+    """Override the PLOT_TITLES default for this process."""
+    global SHOW_TITLES
+    SHOW_TITLES = bool(flag)
+
+
+def add_title_argument(parser: argparse.ArgumentParser) -> None:
+    """Add --titles/--no-titles; leaves the PLOT_TITLES default when neither is given."""
+    parser.add_argument("--titles", dest="titles", action="store_true", default=None,
+                        help="draw the in-plot title (default: off, the LaTeX caption carries it)")
+    parser.add_argument("--no-titles", dest="titles", action="store_false",
+                        help="force the in-plot title off even when PLOT_TITLES=1")
+
+
+def apply_title_argument(args: argparse.Namespace) -> None:
+    """Apply --titles/--no-titles if the user passed one of them."""
+    if getattr(args, "titles", None) is not None:
+        set_titles_enabled(args.titles)
+
+
+def set_title(target: Any, text: str, **kwargs: Any) -> None:
+    """Set an Axes/Figure title only when titles are enabled (see PLOT_TITLES)."""
+    if not SHOW_TITLES:
+        return
+    setter = getattr(target, "set_title", None) or getattr(target, "suptitle")
+    setter(text, **kwargs)
 
 
 # ── Style setup ─────────────────────────────────────────────────
@@ -202,6 +304,182 @@ def apply_style() -> None:
         "savefig.bbox":       "tight",
         "savefig.pad_inches": 0.05,
     })
+# ── Keeping failure callouts off the curves ─────────────────────────────────────────────
+# The ladder callouts are anchored at the failure point and offset a few points to the right,
+# which is clear space on most of these plots and not on all of them. These helpers score a
+# candidate position against everything already drawn and take the first clear one, trying
+# the position the callout already has FIRST — so a callout that is clear never moves, and
+# the anchor never moves at all.
+def _axes_obstacles(ax, exclude_text=None):
+    """Everything a label must not cover, in axes coordinates.
+
+    Curves come back as a densified point cloud with one owner id per series, because a
+    polyline is thin and a label that grazes it is as bad as one that sits on it. Bars, other
+    annotations (with the leader line back to the point they mark), filled bands and the
+    legends already drawn come back as rectangles or paths.
+    """
+    to_axes = (ax.transData + ax.transAxes.inverted()).transform
+    step = 0.004
+    pts_all, owner_all = [], []
+    for idx, line in enumerate(ax.lines):
+        if not line.get_visible():
+            continue
+        xs = np.asarray(line.get_xdata(), dtype=float)
+        ys = np.asarray(line.get_ydata(), dtype=float)
+        ok = np.isfinite(xs) & np.isfinite(ys)
+        xs, ys = xs[ok], ys[ok]
+        if xs.size == 0:
+            continue
+        pts = np.asarray(to_axes(np.column_stack([xs, ys])), dtype=float)
+        dense = [pts[:1]]
+        for i in range(1, len(pts)):
+            a, b = pts[i - 1], pts[i]
+            n = int(max(abs(b[0] - a[0]), abs(b[1] - a[1])) / step)
+            if n > 1:
+                t = np.linspace(0.0, 1.0, min(n, 4000) + 1)[1:, None]
+                dense.append(a + (b - a) * t)
+            else:
+                dense.append(b[None, :])
+        pts = np.vstack(dense)
+        pts_all.append(pts)
+        owner_all.append(np.full(len(pts), idx, dtype=int))
+    cloud = ((np.vstack(pts_all), np.concatenate(owner_all)) if pts_all
+             else (np.zeros((0, 2)), np.zeros(0, dtype=int)))
+
+    fig = ax.figure
+    fig.canvas.draw()
+    rend = fig.canvas.get_renderer()
+    inv = ax.transAxes.inverted()
+    rects = []
+    for patch in ax.patches:
+        if type(patch).__name__ != "Rectangle" or not patch.get_visible():
+            continue
+        (x0, y0), (x1, y1) = to_axes([
+            (patch.get_x(), patch.get_y()),
+            (patch.get_x() + patch.get_width(), patch.get_y() + patch.get_height())])
+        rects.append((min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)))
+    for txt in ax.texts:
+        if txt is exclude_text or not txt.get_visible() or not txt.get_text().strip():
+            continue
+        bb = txt.get_window_extent(rend).transformed(inv)
+        rects.append((bb.x0, bb.y0, bb.x1, bb.y1))
+        xy = getattr(txt, "xy", None)
+        if xy is not None:
+            ax_x, ax_y = to_axes([xy])[0]
+            rects.append((min(bb.x0, ax_x), min(bb.y0, ax_y),
+                          max(bb.x1, ax_x), max(bb.y1, ax_y)))
+    from matplotlib.legend import Legend  # noqa: WPS433
+    for child in list(ax.get_children()) + ([ax.legend_] if ax.legend_ is not None else []):
+        if isinstance(child, Legend):
+            bb = child.get_window_extent(rend).transformed(inv)
+            rects.append((bb.x0, bb.y0, bb.x1, bb.y1))
+
+    paths = []
+    for coll in ax.collections:
+        if not coll.get_visible():
+            continue
+        trans = coll.get_transform() + ax.transAxes.inverted()
+        for path in coll.get_paths():
+            if len(path.vertices):
+                paths.append(path.transformed(trans))
+    return cloud[0], cloud[1], (rects, paths)
+
+
+def _label_score(rect, pts, owners, obstacles) -> float:
+    """How many distinct things a box at ``rect`` would cover."""
+    rects, paths = obstacles
+    score = 0.0
+    for path in paths:
+        verts = path.vertices
+        inside = ((verts[:, 0] >= rect[0]) & (verts[:, 0] <= rect[2])
+                  & (verts[:, 1] >= rect[1]) & (verts[:, 1] <= rect[3]))
+        if inside.any():
+            score += 1.0
+            continue
+        gx = np.linspace(rect[0], rect[2], 7)
+        gy = np.linspace(rect[1], rect[3], 7)
+        if path.contains_points(np.array([(x, y) for x in gx for y in gy])).any():
+            score += 1.0
+    for other in rects:
+        if (other[0] < rect[2] and other[2] > rect[0]
+                and other[1] < rect[3] and other[3] > rect[1]):
+            score += 1.0
+    if len(pts):
+        inside = ((pts[:, 0] >= rect[0]) & (pts[:, 0] <= rect[2])
+                  & (pts[:, 1] >= rect[1]) & (pts[:, 1] <= rect[3]))
+        if inside.any():
+            score += float(np.unique(owners[inside]).size)
+            score += min(int(inside.sum()), 999) / 1000.0
+    return score
+
+
+def _connect_callout(ax, target, min_points: float = 26.0) -> None:
+    """Hairline from a callout that had to travel back to the marker it describes.
+
+    A callout a few points off its cross needs no help; one that had to cross the plot does.
+    The line stops at the edge of the text box, so it never runs under the words.
+    """
+    fig = ax.figure
+    fig.canvas.draw()
+    rend = fig.canvas.get_renderer()
+    dx, dy = target.get_position()
+    if abs(dx) <= min_points and abs(dy) <= min_points:
+        return
+    anchor = ax.transData.transform(target.xy)
+    box = target.get_window_extent(rend).expanded(1.12, 1.25)
+    near = (min(max(anchor[0], box.x0), box.x1), min(max(anchor[1], box.y0), box.y1))
+    (x0, y0), (x1, y1) = ax.transData.inverted().transform([anchor, near])
+    ax.plot([x0, x1], [y0, y1], "-", color=target.get_color(), linewidth=0.5,
+            alpha=0.75, zorder=3, clip_on=False, label="_nolegend_")
+
+
+def place_failure_callouts(ax) -> None:
+    """Move each failure callout to the nearest clear offset, or leave it where it is."""
+    fig = ax.figure
+    targets = [t for t in ax.texts
+               if getattr(t, "anncoords", None) == "offset points"
+               and t.get_visible() and t.get_text().strip()]
+    if not targets:
+        return
+    step = 6.3
+    offsets = []
+    for dx, ha in ((7, "left"), (-7, "right")):
+        for dy in (0.0, 1.6 * step, -1.6 * step, 3.2 * step, -3.2 * step):
+            offsets.append((dx, dy, ha, "center" if dy == 0 else ("bottom" if dy > 0 else "top")))
+    offsets += [(0, 2.2 * step, "center", "bottom"), (0, -2.2 * step, "center", "top")]
+    for dx, ha in ((7, "left"), (-7, "right"), (26, "left"), (-26, "right"),
+                   (52, "left"), (-52, "right")):
+        for dy in (5 * step, -5 * step, 8 * step, -8 * step, 12 * step, -12 * step, 0.0):
+            offsets.append((dx, dy, ha, "center" if dy == 0 else ("bottom" if dy > 0 else "top")))
+    for target in targets:
+        start = (target.get_position(), target.get_ha(), target.get_va())
+        candidates = [(start[0][0], start[0][1], start[1], start[2])] + offsets
+        pts, owners, obstacles = _axes_obstacles(ax, exclude_text=target)
+        best = None
+        for dx, dy, ha, va in candidates:
+            target.set_position((dx, dy))
+            target.set_ha(ha)
+            target.set_va(va)
+            fig.canvas.draw()
+            rend = fig.canvas.get_renderer()
+            bb = target.get_window_extent(rend).transformed(ax.transAxes.inverted())
+            rect = (bb.x0, bb.y0, bb.x1, bb.y1)
+            score = _label_score(rect, pts, owners, obstacles)
+            if bb.x0 < 0.004 or bb.x1 > 0.996 or bb.y0 < 0.004 or bb.y1 > 0.996:
+                score += 10.0
+            if best is None or score < best[0] - 1e-9:
+                best = (score, (dx, dy), ha, va)
+            if score <= 0.0:
+                break
+        target.set_position(best[1])
+        target.set_ha(best[2])
+        target.set_va(best[3])
+        _connect_callout(ax, target)
+        ax.__dict__.setdefault("_pd_callout_scores", []).append(
+            (target.get_text().replace("\n", " / "), round(best[0], 3)))
+    if os.environ.get("PD_LEGEND_DEBUG"):
+        for text, score in ax.__dict__.get("_pd_callout_scores", []):
+            print(f"  [callout] {text!r} covers {score}", flush=True)
 
 
 def save_fig(fig: plt.Figure, output_dir: Path, name: str) -> None:
@@ -308,9 +586,43 @@ def _collect_e1_raw(e1_dir: Path) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
 
 # ── E1 Plots (Figs 8, 9, 10) ───────────────────────────────────
 
+def _restrict_to_common_subset(summaries: Dict[str, Dict[str, List[Dict[str, Any]]]],
+                               path: Path) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
+    """Keep only the queries of the per-suite common subset (experiments/common_subset.py).
+
+    The protocol reports E1 runtimes over the queries every audited engine completes
+    (minus near-timeouts); a suite missing from the JSON is left untouched.
+    """
+    import json as _json
+    try:
+        spec = _json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"common subset: cannot read {path}: {exc} -- using all queries", file=sys.stderr)
+        return summaries
+    restricted: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+    for engine, suites in summaries.items():
+        for suite, rows in suites.items():
+            common = (spec.get("suites") or {}).get(suite, {}).get("common")
+            if common is None:
+                kept = rows
+            else:
+                allowed = set(common)
+                kept = [r for r in rows if str(r.get("query_id")) in allowed]
+            print(f"common subset: {engine}/{suite}: {len(kept)}/{len(rows)} queries")
+            restricted.setdefault(engine, {})[suite] = kept
+    return restricted
+
+
 def plot_fig8_bar(summaries: Dict[str, Dict[str, List[Dict[str, Any]]]],
-                  output_dir: Path, agg: str, fname: str, title: str) -> None:
-    """Bar chart comparing runtime aggregates per engine, TPC-DS vs Prod-DS."""
+                  output_dir: Path, agg: str, fname: str, title: str,
+                  ylabel: str = "Query runtime (s)") -> None:
+    """Bar chart comparing runtime aggregates per engine, TPC-DS vs Prod-DS.
+
+    ``agg="sum"`` is the TOTAL WORKLOAD RUNTIME and needs its own y-axis label: it is the sum
+    over queries of each query's median, not a per-query runtime, and not the wall time of a
+    measured workload pass -- the harness runs repetitions query-major, so no complete pass was
+    ever timed (docs/08-measurement-contract.md).
+    """
     engines = [e for e in ENGINE_ORDER if e in summaries]
     if not engines:
         return
@@ -326,7 +638,7 @@ def plot_fig8_bar(summaries: Dict[str, Dict[str, List[Dict[str, Any]]]],
         for eng in engines:
             rows = summaries.get(eng, {}).get(suite, [])
             times = [t for r in rows
-                     if (t := safe_float(r.get("median_ms"))) is not None and t > 0]
+                     if (t := safe_float(r.get(SUMMARY_TIME_COL))) is not None and t > 0]
             if not times:
                 vals.append(0.0)
                 continue
@@ -359,8 +671,8 @@ def plot_fig8_bar(summaries: Dict[str, Dict[str, List[Dict[str, Any]]]],
                         ha="center", va="bottom", fontsize=5.5)
 
     ax.set_yscale("log")
-    ax.set_ylabel("Query runtime (s)")
-    ax.set_title(title)
+    ax.set_ylabel(ylabel)
+    set_title(ax, title)
     ax.set_xticks(x)
     ax.set_xticklabels([engine_label(e) for e in engines])
     # Legend keys the hatch to the suite (engine colour is read off the x-axis).
@@ -369,10 +681,10 @@ def plot_fig8_bar(summaries: Dict[str, Dict[str, List[Dict[str, Any]]]],
         Patch(facecolor="#d9d9d9", edgecolor="#333333", label="TPC-DS"),
         Patch(facecolor="#d9d9d9", edgecolor="#333333", hatch="////", label="Prod-DS"),
     ]
-    ax.legend(handles=suite_handles, loc="upper left")
     ax.yaxis.set_minor_locator(ticker.LogLocator(subs="auto", numticks=20))
     ax.yaxis.set_minor_formatter(ticker.NullFormatter())
     ax.set_ylim(top=ax.get_ylim()[1] * 2.5)  # headroom for value labels + legend
+    ax.legend(handles=suite_handles, loc="upper left")
     fig.tight_layout()
     save_fig(fig, output_dir, fname)
 
@@ -380,13 +692,13 @@ def plot_fig8_bar(summaries: Dict[str, Dict[str, List[Dict[str, Any]]]],
 def plot_fig9_cdf(summaries: Dict[str, Dict[str, List[Dict[str, Any]]]],
                   output_dir: Path) -> None:
     """CDF of per-query median runtime on Prod-DS, one line per engine."""
-    fig, ax = plt.subplots(figsize=(6, 3.2 * HEIGHT_SCALE))  # flattened to ~fig13 aspect (CDF/table not taller than the STR sweep)
+    fig, ax = plt.subplots(figsize=(6, 3.2 * HEIGHT_SCALE))  # flattened to ~fig13 aspect
     plotted = False
 
     for eng in ENGINE_ORDER:
         rows = summaries.get(eng, {}).get("prodds", [])
         times = sorted(t / 1000.0 for r in rows
-                       if (t := safe_float(r.get("median_ms"))) is not None and t > 0)
+                       if (t := safe_float(r.get(SUMMARY_TIME_COL))) is not None and t > 0)
         if not times:
             continue
         cdf_y = np.arange(1, len(times) + 1) / len(times)
@@ -401,7 +713,7 @@ def plot_fig9_cdf(summaries: Dict[str, Dict[str, List[Dict[str, Any]]]],
     ax.set_xscale("log")
     ax.set_xlabel("Per-query median runtime (s, log scale)")
     ax.set_ylabel("CDF")
-    ax.set_title("Per-query runtime CDF on Prod-DS")
+    set_title(ax, "Per-query runtime CDF on Prod-DS")
     ax.set_ylim(0, 1.02)
     ax.legend(loc="lower right")
     fig.tight_layout()
@@ -412,13 +724,13 @@ def plot_fig9b_cdf_engines(summaries: Dict[str, Dict[str, List[Dict[str, Any]]]]
                            output_dir: Path) -> None:
     """CDF of per-query median runtime per ENGINE — TPC-DS (solid) vs Prod-DS (dashed),
     coloured by engine (same palette as Fig 8). Shows the per-engine workload shift."""
-    fig, ax = plt.subplots(figsize=(6, 3.2 * HEIGHT_SCALE))  # flattened to ~fig13 aspect (CDF/table not taller than the STR sweep)
+    fig, ax = plt.subplots(figsize=(6, 3.2 * HEIGHT_SCALE))  # flattened to ~fig13 aspect
     plotted = False
     for eng in ENGINE_ORDER:
         for suite, ls in (("tpcds", "-"), ("prodds", "--")):
             rows = summaries.get(eng, {}).get(suite, [])
             times = sorted(t / 1000.0 for r in rows
-                           if (t := safe_float(r.get("median_ms"))) is not None and t > 0)
+                           if (t := safe_float(r.get(SUMMARY_TIME_COL))) is not None and t > 0)
             if not times:
                 continue
             cdf_y = np.arange(1, len(times) + 1) / len(times)
@@ -431,7 +743,7 @@ def plot_fig9b_cdf_engines(summaries: Dict[str, Dict[str, List[Dict[str, Any]]]]
     ax.set_xscale("log")
     ax.set_xlabel("Per-query median runtime (s, log scale)")
     ax.set_ylabel("CDF")
-    ax.set_title("Per-query runtime CDF: TPC-DS vs Prod-DS")
+    set_title(ax, "Per-query runtime CDF: TPC-DS vs Prod-DS")
     ax.set_ylim(0, 1.02)
     # Two legends: engine colour (lower-right) + suite line-style key (upper-left).
     from matplotlib.lines import Line2D
@@ -445,28 +757,58 @@ def plot_fig9b_cdf_engines(summaries: Dict[str, Dict[str, List[Dict[str, Any]]]]
     save_fig(fig, output_dir, "fig9b_cdf_tpcds_vs_prodds.png")
 
 
-def plot_fig10_errors(raw: Dict[str, Dict[str, List[Dict[str, Any]]]],
-                      output_dir: Path) -> None:
-    """Stacked bar: error breakdown per engine on Prod-DS."""
-    engines = [e for e in ENGINE_ORDER if e in raw and "prodds" in raw[e]]
-    if not engines:
-        return
+def _audit_error_counts(results_dir: Path, timeout_s: float) -> Dict[str, Dict[str, int]]:
+    """Per-engine Prod-DS outcome counts from the E0 audit, with the Table 4 taxonomy.
 
-    # Count unique (query_id, status) keeping last repetition
-    engine_counts: Dict[str, Dict[str, int]] = {}
-    for eng in engines:
-        records = raw[eng].get("prodds", [])
-        # Take status per query_id from the last record for that query
-        per_query: Dict[str, str] = {}
-        for rec in records:
-            qid = rec.get("query_id", "")
-            per_query[qid] = rec.get("status", "error")
-
+    Under the audit-first protocol E1 runs the common subset only, where every query
+    succeeds by construction, so counting E1 statuses would report zero failures for every
+    engine. The failures live in the E0 audit pass, which runs the full query set once per
+    engine; that is what both this figure and E1_error_breakdown.csv report.
+    """
+    if not (results_dir / "E0").is_dir():
+        return {}
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from experiments.common_subset import analyse as cs_analyse  # noqa: WPS433
+        rep = cs_analyse(results_dir, None, timeout_s, timeout_s * 0.033, experiment="E0")
+    except Exception:                                              # noqa: BLE001
+        return {}
+    suite = (rep.get("suites") or {}).get("prodds")
+    if not suite:
+        return {}
+    out: Dict[str, Dict[str, int]] = {}
+    for engine, info in suite["engines"].items():
         counts: Dict[str, int] = defaultdict(int)
-        for status in per_query.values():
-            cat = status if status in ERROR_COLORS else "error"
-            counts[cat] += 1
-        engine_counts[eng] = dict(counts)
+        counts["success"] = info["success"]
+        for _q, why in info["failed"].items():
+            counts[CAUSE_TO_CATEGORY.get(why["cause"], "failure")] += 1
+        out[engine] = dict(counts)
+    return out
+
+
+def plot_fig10_errors(raw: Dict[str, Dict[str, List[Dict[str, Any]]]],
+                      output_dir: Path,
+                      audit_counts: Optional[Dict[str, Dict[str, int]]] = None) -> None:
+    """Stacked bar: error breakdown per engine on Prod-DS."""
+    if audit_counts:
+        engines = [e for e in ENGINE_ORDER if e in audit_counts]
+        engine_counts = {e: audit_counts[e] for e in engines}
+        if not engines:
+            return
+    else:
+        engines = [e for e in ENGINE_ORDER if e in raw and "prodds" in raw[e]]
+        if not engines:
+            return
+        # Fallback for result trees without an audit pass: count E1 statuses per query.
+        engine_counts = {}
+        for eng in engines:
+            per_query: Dict[str, str] = {}
+            for rec in raw[eng].get("prodds", []):
+                per_query[rec.get("query_id", "")] = rec.get("status", "error")
+            counts: Dict[str, int] = defaultdict(int)
+            for status in per_query.values():
+                counts[status if status in ERROR_COLORS else "error"] += 1
+            engine_counts[eng] = dict(counts)
 
     # Determine which categories actually appear
     cats_present = [c for c in ERROR_CATEGORIES
@@ -481,22 +823,55 @@ def plot_fig10_errors(raw: Dict[str, Dict[str, List[Dict[str, Any]]]],
     totals = {e: max(sum(engine_counts[e].values()), 1) for e in engines}
     bottoms = np.zeros(len(engines))
 
+    small_slot = defaultdict(int)          # per engine: how many thin labels already placed
     for cat in cats_present:
+        counts = np.array([engine_counts[e].get(cat, 0) for e in engines], dtype=float)
         vals = np.array([engine_counts[e].get(cat, 0) / totals[e] * 100 for e in engines],
                         dtype=float)
         ax.bar(x, vals, bar_width, bottom=bottoms,
                label=ERROR_LABELS.get(cat, cat),
                color=ERROR_COLORS.get(cat, "#888"),
                edgecolor="white", linewidth=0.5)
+        # A failure category is often a sliver: 1 of 107 queries is under one percent of the
+        # bar and invisible. Write the query count next to it so the figure still reports it.
+        if cat != "success":
+            for xi, (n, v, b) in enumerate(zip(counts, vals, bottoms)):
+                if n <= 0:
+                    continue
+                if v >= 4.0:
+                    ax.text(xi, b + v / 2, f"{int(n)}", ha="center", va="center",
+                            fontsize=7.5, color="white", fontweight="bold")
+                else:
+                    # Stagger thin labels so two slivers on the same bar do not collide, and
+                    # send them DOWNWARD once the sliver is near the top of the bar: pointing
+                    # up from there puts the callout, and its leader, into the legend band.
+                    near_top = (b + v / 2) > 82.0
+                    slot = small_slot[xi]
+                    dy = (-(11 + 11 * slot)) if near_top else (11 + 11 * slot)
+                    small_slot[xi] += 1
+                    ax.annotate(f"{int(n)}", xy=(xi + bar_width / 2, b + v / 2),
+                                xytext=(11, dy), textcoords="offset points",
+                                ha="left", va="center", fontsize=7.5,
+                                color=ERROR_COLORS.get(cat, "#888"), fontweight="bold",
+                                arrowprops=dict(arrowstyle="-", linewidth=0.6,
+                                                color=ERROR_COLORS.get(cat, "#888"),
+                                                shrinkA=0, shrinkB=1))
         bottoms += vals
+
+    for xi, e in enumerate(engines):
+        ax.text(xi, 1.5, f"{engine_counts[e].get('success', 0)}/{totals[e]}",
+                ha="center", va="bottom", fontsize=7.5, color="white", fontweight="bold")
 
     ax.set_ylabel("Share (%)")
     ax.set_ylim(0, 100)
-    ax.set_title("Prod-DS error breakdown", pad=22)
+    ax.set_xlim(-0.6, len(engines) - 0.25)
+    set_title(ax, "Prod-DS error breakdown", pad=22)
     ax.set_xticks(x)
     ax.set_xticklabels([engine_label(e) for e in engines])
-    # Legend ABOVE the axes (horizontal), like the paper — never over a bar.
-    ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0),
+    # Legend ABOVE the axes (horizontal), like the paper — never over a bar. It gets a band
+    # of its own: the sliver callouts sit just outside the bars and their leader lines reach
+    # further still, so anchoring the legend flush at 1.0 put the two on top of each other.
+    ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.045),
               ncol=len(cats_present), frameon=False, fontsize=7.5,
               handlelength=1.1, columnspacing=1.3)
     fig.tight_layout()
@@ -654,13 +1029,18 @@ def _plot_failure_points(ax, data, level_fn, time_field: str, unit: str = "J",
         else:
             txt = f"{unit}={lv}: {kind}"
         ax.annotate(txt, xy=(lv, y), xytext=(7, label_dy), textcoords="offset points",
-                    fontsize=6.3, fontweight="bold", color=col, ha="left", va=label_va, clip_on=False)
+                    fontsize=6.3, fontweight="bold", color=col, ha="left", va=label_va,
+                    clip_on=False)
 
 
 def plot_fig11(e2_data: Dict[str, List[Dict[str, Any]]], output_dir: Path) -> None:
-    """One log-log diagram: join-scaling EXECUTION (solid) and PLANNING (dashed)
-    median time vs join level, per engine (colour). Both series share a single
-    millisecond y-axis, so planning and execution are read off the same scale."""
+    """One log-log diagram per engine (colour): the wall time of the EXECUTION CLIENT (solid)
+    and of the separately executed EXPLAIN CLIENT (dashed) against join level.
+
+    Neither series is an engine-internal phase. `wall_time_ms_planning` is one client process
+    running `EXPLAIN <query>` end to end -- spawn, connect, parse, optimise, print, exit -- so it
+    is labelled "EXPLAIN client", never "planning time" (docs/08-measurement-contract.md). Both
+    share one y-axis, so the two clients are read off the same scale."""
     engines = [e for e in ENGINE_ORDER if e in e2_data]
     if not engines:
         return
@@ -675,9 +1055,9 @@ def plot_fig11(e2_data: Dict[str, List[Dict[str, Any]]], output_dir: Path) -> No
             ax.plot(ex_levels, [m / 1000.0 for m in ex_meds], "o-", color=col,
                     linewidth=1.8, markersize=5, label=engine_label(eng))
             plotted = True
-        # require_success=False: planning is logged even when execution fails, so
-        # CedarDB's J256 planning point (107 ms) extends the dashed line one notch
-        # past its solid execution line — the OOM is execution-stage, not planning.
+        # require_success=False: the EXPLAIN client is logged even when the execution client
+        # fails, so CedarDB's J256 EXPLAIN point (107 ms) extends the dashed line one notch past
+        # its solid line — the OOM happens in the execution client, not while planning.
         pl_levels, pl_meds = _aggregate_by_level(
             e2_data[eng], _extract_join_level, "wall_time_ms_planning",
             require_success=False)
@@ -686,8 +1066,9 @@ def plot_fig11(e2_data: Dict[str, List[Dict[str, Any]]], output_dir: Path) -> No
                     linewidth=1.5, markersize=4, label="_nolegend_")
             plotted = True
 
-    # Overlay MonetDB join planning from the plan-only probe (the harness logged None for MonetDB).
-    # Spans ALL levels incl. execution-failed ones — planning completes even when execution times out.
+    # Overlay MonetDB's EXPLAIN-only probe (the harness logged None for MonetDB: its adapter skips
+    # the EXPLAIN stage). Same instrument as the dashed lines — one client running EXPLAIN. Spans
+    # ALL levels incl. execution-failed ones: EXPLAIN returns even when the execution client dies.
     if _MONET_JOIN_PLANNING_JSON.is_file():
         try:
             import json as _json
@@ -712,33 +1093,31 @@ def plot_fig11(e2_data: Dict[str, List[Dict[str, Any]]], output_dir: Path) -> No
     ax.set_xscale("log", base=2)
     ax.set_yscale("log")
     ax.set_xlabel("Join level")
-    ax.set_ylabel("Median time (s)")
-    ax.set_title("Join scaling: execution vs planning time")
+    ax.set_ylabel(JOIN_YLABEL)
+    set_title(ax, "Join scaling: execution client vs EXPLAIN client")
     ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
     ax.xaxis.set_minor_formatter(ticker.NullFormatter())
 
-    # Two legends: engine colours (upper-left) + a line-style key (lower-right)
-    # telling execution (solid o) from planning (dashed s) — they share each
-    # engine's colour, so the style key is what disambiguates the two series.
+    # Two legends: engine colours (upper-left) + a line-style key (lower-right) telling the
+    # execution client (solid o) from the EXPLAIN client (dashed s) — they share each engine's
+    # colour, so the style key is what disambiguates the two series.
     from matplotlib.lines import Line2D
     engine_handles, engine_names = ax.get_legend_handles_labels()
     style_handles = [
         Line2D([0], [0], color="#555555", linestyle="-", marker="o",
-               markersize=5, label="Execution"),
+               markersize=5, label=JOIN_SERIES_LABELS[0]),
         Line2D([0], [0], color="#555555", linestyle="--", marker="s",
-               markersize=4, label="Planning"),
+               markersize=4, label=JOIN_SERIES_LABELS[1]),
     ]
+    # Headroom at the top, before the legends are placed: placement is decided in axes
+    # coordinates, so the y range has to be final first.
+    ax.set_ylim(top=ax.get_ylim()[1] * 4)
     if engine_handles:
-        # Upper-right: the empty quadrant (CedarDB/MonetDB stop at J128, only
-        # DuckDB runs on), so the legend never hides the sparse MonetDB points.
         leg_engines = ax.legend(engine_handles, engine_names, loc="upper right",
                                 fontsize=8, framealpha=0.9)
         ax.add_artist(leg_engines)
-    ax.legend(handles=style_handles, loc="lower right", fontsize=8,
-              framealpha=0.9)
-    # Headroom at the top so the upper-left engine legend clears the topmost
-    # lines (esp. MonetDB's sparse SF100 point, which otherwise hides behind it).
-    ax.set_ylim(top=ax.get_ylim()[1] * 4)
+    ax.legend(handles=style_handles, loc="lower right", fontsize=8, framealpha=0.9)
+    place_failure_callouts(ax)
 
     # (OE-8 done: MonetDB's SF100 join is protocol-faithful + version-specific, not a
     #  pending artifact — no figure footnote; discussed in the text instead.)
@@ -788,7 +1167,7 @@ def plot_fig12(e3_data: Dict[str, List[Dict[str, Any]]], output_dir: Path) -> No
 
     for eng in engines:
         levels, meds = _aggregate_by_level(
-            e3_data[eng], _extract_union_level, "wall_time_ms_total")
+            e3_data[eng], _extract_union_level, RAW_TIME_FIELD)
         if not levels:
             continue
         mk = {"duckdb": "o", "cedardb": "s", "monetdb": "^", "postgres": "D"}.get(eng, "o")
@@ -813,17 +1192,18 @@ def plot_fig12(e3_data: Dict[str, List[Dict[str, Any]]], output_dir: Path) -> No
 
     # Mark every hard failure with an × at its measured time-to-failure (cell-limit / OOM / timeout
     # with time) — drawn before the y-headroom so autoscale includes the timeout points.
-    _plot_failure_points(ax, e3_data, _extract_union_level, "wall_time_ms_total", "U",
+    _plot_failure_points(ax, e3_data, _extract_union_level, RAW_TIME_FIELD, "U",
                          label_dy=-8, label_va="top")  # push the U256 timeout label below its × so it clears the top frame
 
     ax.set_xscale("log", base=2)
     ax.set_yscale("log")
     ax.set_xlabel("UNION ALL fan-in level")
-    ax.set_ylabel("Median end-to-end runtime (s)")
-    ax.set_title("UNION ALL scaling")
+    ax.set_ylabel(UNION_YLABEL)
+    set_title(ax, "UNION ALL scaling")
     ax.legend()
     ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
     ax.xaxis.set_minor_formatter(ticker.NullFormatter())
+    place_failure_callouts(ax)
     fig.tight_layout()
     save_fig(fig, output_dir, "fig12_union_runtime.png")
 
@@ -842,7 +1222,7 @@ def _collect_e4(e4_dir: Path) -> List[Dict[str, Any]]:
         if raw_path:
             for rec in load_jsonl(raw_path):
                 if rec.get("string_level") is None:
-                    m = re.search(r"str(\d+)", sub.name)
+                    m = re.fullmatch(r"str(\d+)", sub.name)
                     if m:
                         rec["string_level"] = int(m.group(1))
                 records.append(rec)
@@ -858,7 +1238,7 @@ def plot_fig13(e4_records: List[Dict[str, Any]], output_dir: Path) -> None:
             continue
         qid = rec.get("query_id", "")
         sl = rec.get("string_level")
-        t = safe_float(rec.get("wall_time_ms_total"))
+        t = safe_float(rec.get(RAW_TIME_FIELD))
         if sl is not None and t is not None and t > 0:
             groups[(qid, int(sl))].append(t)
 
@@ -914,7 +1294,7 @@ def plot_fig13(e4_records: List[Dict[str, Any]], output_dir: Path) -> None:
     ax.axhline(1.0, color="#999999", linestyle="--", linewidth=0.8)
     ax.set_xlabel("Stringification level (STR)")
     ax.set_ylabel(f"Normalized runtime (vs STR={base_level})")
-    ax.set_title("Stringification sweep: runtime by STR level")
+    set_title(ax, "Stringification sweep: runtime by STR level")
     ax.set_xticks(levels)
     ax.legend(loc="upper left")
     fig.tight_layout()
@@ -957,7 +1337,7 @@ def plot_table3(e5_data: Dict[str, Dict[str, List[Dict[str, Any]]]],
         return
 
     # Compute per-engine total successful runtime for each variant
-    variants = [v for v in ["sparsity_only", "skew_only", "combined"]
+    variants = [v for v in ["sparsity_only", "skew_only", "keyskew_only", "skew_all", "combined", "full"]
                 if v in e5_data]
     if not variants:
         return
@@ -978,7 +1358,7 @@ def plot_table3(e5_data: Dict[str, Dict[str, List[Dict[str, Any]]]],
         for r in records:
             if r.get("status") != "success":
                 continue
-            t = safe_float(r.get("wall_time_ms_total"))
+            t = safe_float(r.get(RAW_TIME_FIELD))
             q = r.get("query_id")
             if t is not None and t > 0 and q:
                 per_q.setdefault(q, []).append(t)
@@ -987,7 +1367,7 @@ def plot_table3(e5_data: Dict[str, Dict[str, List[Dict[str, Any]]]],
     baseline_maps = {eng: _success_map(e5_data["baseline"].get(eng, []))
                      for eng in engines}
 
-    fig, ax = plt.subplots(figsize=(6, 3.2 * HEIGHT_SCALE))  # flattened to ~fig13 aspect (CDF/table not taller than the STR sweep)
+    fig, ax = plt.subplots(figsize=(6, 3.2 * HEIGHT_SCALE))  # flattened to ~fig13 aspect
     n_variants = len(variants)
     n_engines = len(engines)
     bar_width = 0.8 / max(n_engines, 1)
@@ -1011,13 +1391,23 @@ def plot_table3(e5_data: Dict[str, Dict[str, List[Dict[str, Any]]]],
                color=engine_color(eng), edgecolor="white", linewidth=0.5)
 
     ax.axhline(0, color="#333333", linewidth=0.8)
-    ax.set_ylabel(r"$\Delta$% total runtime vs baseline")
-    ax.set_title("Sparsity & skew sensitivity")
+    # NOT "Δ% total runtime": no complete workload pass was ever timed. This is the change in
+    # the SUM of per-query medians over the queries that succeed in BOTH the baseline and the
+    # arm — a percentage change of a sum, not a median of per-query percentages. Two lines,
+    # because one line of this at the placed size runs past both ends of the axis.
+    ax.set_ylabel("$\\Delta$ summed query\nmedians (%)")
+    set_title(ax, "Sparsity & skew sensitivity")
     ax.set_xticks(x)
+    # Two lines each: at the placed size the one-line names of neighbouring categories run
+    # into each other.
+    # Named by mechanism, two lines, so neighbouring categories do not touch (`docs/05`).
     variant_labels = {
-        "sparsity_only": "Sparsity only",
-        "skew_only":     "Skew only",
-        "combined":      "Combined",
+        "sparsity_only": "NULL\nonly",
+        "skew_only":     "MCV\nonly",
+        "keyskew_only":  "Keys\nonly",
+        "skew_all":      "MCV +\nkeys",
+        "combined":      "NULL +\nMCV",
+        "full":          "All\nthree",
     }
     ax.set_xticklabels([variant_labels.get(v, v) for v in variants])
     ax.legend()
@@ -1034,7 +1424,13 @@ def main() -> None:
                         help="Base results directory (e.g. .reproduce/results)")
     parser.add_argument("--output-dir", required=True, type=Path,
                         help="Directory to save PNG plots")
+    parser.add_argument("--common-subset", type=Path, default=None,
+                        help="common_subset.json written by experiments/common_subset.py; restricts the "
+                             "E1 runtime figures (Figs 8/9) to the common success set per suite "
+                             "(the error breakdown, Fig 10, keeps every query)")
+    add_title_argument(parser)
     args = parser.parse_args()
+    apply_title_argument(args)
 
     results_dir: Path = args.results_dir
     output_dir: Path = args.output_dir
@@ -1058,6 +1454,8 @@ def main() -> None:
     if e1_dir.is_dir():
         print("E1: generating Figs 8, 9, 10 ...")
         summaries = _collect_e1_summaries(e1_dir)
+        if args.common_subset:
+            summaries = _restrict_to_common_subset(summaries, args.common_subset)
         raw = _collect_e1_raw(e1_dir)
 
         if summaries:
@@ -1069,13 +1467,15 @@ def main() -> None:
                           "Average query runtime: TPC-DS vs Prod-DS")
             plot_fig8_bar(summaries, output_dir, "sum",
                           "fig8c_total_runtime.png",
-                          "Total workload runtime: TPC-DS vs Prod-DS")
+                          "Total workload runtime: TPC-DS vs Prod-DS",
+                          ylabel="Total workload runtime (s)")
             plot_fig9_cdf(summaries, output_dir)
             plot_fig9b_cdf_engines(summaries, output_dir)
             generated += 4
 
-        if raw:
-            plot_fig10_errors(raw, output_dir)
+        audit_counts = _audit_error_counts(results_dir, 1800.0)
+        if raw or audit_counts:
+            plot_fig10_errors(raw, output_dir, audit_counts)
             generated += 1
     else:
         print("E1: skipped (directory not found)")

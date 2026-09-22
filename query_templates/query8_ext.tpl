@@ -36,6 +36,10 @@
  define QOY=random(1,2,uniform);
  define ZIP=ulist(random(10000,99999,uniform),400);  
  define _LIMIT=100;
+define SCOUNTY = ulist(random(1, rowcount("active_counties", "store"), uniform), 3);
+define SSTATE_A = distmember(fips_county, [SCOUNTY.1], 3);
+define SSTATE_B = distmember(fips_county, [SCOUNTY.2], 3);
+define SSTATE_C = distmember(fips_county, [SCOUNTY.3], 3);
 select s_store_name
      ,sum(ss_net_profit) as total_net_profit
      ,any_value(s_city) as any_city
@@ -143,7 +147,7 @@ select s_store_name
  where ss_store_sk = s_store_sk
   and ss_sold_date_sk = d_date_sk
   and d_qoy = [QOY] and d_year = [YEAR]
-  and s_state in ('CA','WA','GA','TX')
+  and s_state in ('[SSTATE_A]','[SSTATE_B]','[SSTATE_C]')
   and s_market_desc is not null
   and (substr(s_zip,1,2) = substr(V1.ca_zip,1,2))
  group by s_store_name

@@ -38,6 +38,7 @@
  define STATE=ulist(dist(fips_county,3,1),7);
  define MONTH=ulist(random(1,12,uniform),6);
  define _LIMIT=100;
+define CACITY = ulist(dist(cities, 1, 6), 3);
 select i_item_id,
         ca_country,
         ca_state, 
@@ -69,7 +70,7 @@ select i_item_id,
        ca_state in ('[STATE.1]','[STATE.2]','[STATE.3]'
                    ,'[STATE.4]','[STATE.5]','[STATE.6]','[STATE.7]')
        and cd2.cd_marital_status in ('M','S')
-       and ca_city in ('Seattle','Austin','Miami')
+       and ca_city in ('[CACITY.1]','[CACITY.2]','[CACITY.3]')
        and i_category in ('Home','Electronics','Sports')
  group by rollup (i_item_id, ca_country, ca_state, ca_county)
  order by max_sold_ts desc,

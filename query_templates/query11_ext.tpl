@@ -38,6 +38,7 @@
                        ,{"t_s_secyear.customer_login",1}
                        ,{"t_s_secyear.customer_email_address",1});
  define _LIMIT=100;
+define BCOUNTRY = ulist(dist(countries, 1, 1), 3);
 with year_total as (
  select c_customer_id customer_id
        ,c_first_name customer_first_name
@@ -114,7 +115,7 @@ with year_total as (
          and t_s_firstyear.year_total > 0
          and t_s_firstyear.customer_preferred_cust_flag = 'Y'
          and t_s_firstyear.customer_birth_country is not null
-         and t_s_firstyear.customer_birth_country in ('United States','Canada','Mexico')
+         and t_s_firstyear.customer_birth_country not in ('[BCOUNTRY.1]','[BCOUNTRY.2]','[BCOUNTRY.3]')
          and t_s_firstyear.customer_email_address is not null
          and case when t_w_firstyear.year_total > 0 then t_w_secyear.year_total / t_w_firstyear.year_total else 0.0 end
              > case when t_s_firstyear.year_total > 0 then t_s_secyear.year_total / t_s_firstyear.year_total else 0.0 end

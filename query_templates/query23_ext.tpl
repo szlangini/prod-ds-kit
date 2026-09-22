@@ -36,6 +36,7 @@
  define MONTH = random(1,7,uniform); 
  define TOPPERCENT=random(95,95,uniform); 
  define _LIMIT=100;
+define BCOUNTRY = ulist(dist(countries, 1, 1), 2);
 with frequent_ss_items as 
  (select substr(i_item_desc,1,30) itemdesc,i_item_sk item_sk,d_date solddate,count(*) cnt
   from store_sales
@@ -63,7 +64,7 @@ with frequent_ss_items as
  from store_sales
       ,customer
  where ss_customer_sk = c_customer_sk
-  and c_birth_country in ('United States','Canada')
+  and c_birth_country in ('[BCOUNTRY.1]','[BCOUNTRY.2]')
   group by c_customer_sk
   having sum(ss_quantity*ss_sales_price) > 0) select sum(sales)
  from (select cs_quantity*cs_list_price sales
@@ -113,7 +114,7 @@ with frequent_ss_items as
  from store_sales
       ,customer
  where ss_customer_sk = c_customer_sk
-  and c_birth_country in ('United States','Canada')
+  and c_birth_country in ('[BCOUNTRY.1]','[BCOUNTRY.2]')
   group by c_customer_sk
   having sum(ss_quantity*ss_sales_price) > 0) select c_last_name,c_first_name,sales
       ,any_value(c_birth_country) as any_birth_country

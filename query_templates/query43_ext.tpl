@@ -36,6 +36,14 @@
  define GMT=distmember(fips_county,[COUNTY], 6);
  define YEAR=random(1998,2002,uniform);
  define _LIMIT=100;
+define SCOUNTY = ulist(random(1, rowcount("active_counties", "store"), uniform), 3);
+define SSTATE_A = distmember(fips_county, [SCOUNTY.1], 3);
+define SSTATE_B = distmember(fips_county, [SCOUNTY.2], 3);
+define SSTATE_C = distmember(fips_county, [SCOUNTY.3], 3);
+define SCITYNUM = ulist(random(1, rowcount("active_cities", "store"), uniform), 3);
+define SCITY_A = distmember(cities, [SCITYNUM.1], 1);
+define SCITY_B = distmember(cities, [SCITYNUM.2], 1);
+define SCITY_C = distmember(cities, [SCITYNUM.3], 1);
 select s_store_name, s_store_id,
         sum(case when (d_day_name='Sunday') then ss_sales_price else null end) sun_sales,
         sum(case when (d_day_name='Monday') then ss_sales_price else null end) mon_sales,
@@ -52,9 +60,9 @@ select s_store_name, s_store_id,
        s_store_sk = ss_store_sk and
        s_gmt_offset = [GMT] and
        d_year = [YEAR] and
-       s_state in ('CA','WA','GA','TX')
+       s_state in ('[SSTATE_A]','[SSTATE_B]','[SSTATE_C]')
        and s_market_desc is not null
-       and s_city in ('Seattle','Atlanta','Denver')
+       and s_city in ('[SCITY_A]','[SCITY_B]','[SCITY_C]')
        and s_company_name is not null
  group by s_store_name, s_store_id
  order by sun_sales desc,mon_sales desc,tue_sales desc,wed_sales desc,thu_sales desc,fri_sales desc,sat_sales desc ; 

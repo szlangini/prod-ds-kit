@@ -1,0 +1,139 @@
+# Join-key skew profiles (default-ON in the CLI; --disable-key-skew turns the
+# axis off, like NULL/MCV; library callers opt in explicitly).
+#
+# Redirects a calibrated share of fact-table foreign keys (customer, store,
+# demographics, address, promo, warehouse, page/site/... -- 41 channel/domain
+# pairs; the date family is vanilla in the default tier) to that column's
+# natural dominant key, creating join-fan-out and aggregation skew that FK->PK
+# equi-joins cannot turn into empty results: each key value keeps a share of
+# its original occurrences in expectation (f1 is additionally floored so at
+# least KEY_SKEW_MIN_RETENTION survives even under saturation), and the hot
+# key is an existing dimension key.
+#
+# The per-(channel, domain) target T is drawn from the fleet-calibrated
+# max_value_buckets shape (Redshift "Maximum MCV frequency" curve, "Why TPC Is
+# Not Enough" Fig 9), CAPPED at 0.80 in the default tier: fact-FK domains
+# conjoin multiplicatively, the fleet's extreme mass is carried by the MCV
+# axis instead. See docs/key-skew.md.
+#
+# Tier aliases: low -> key_low, medium -> key_fleet_default, high -> key_high.
+# `item` and `inventory` FKs are deliberately not skewed: their primary keys
+# are composed of FKs, so redirection would create duplicate composite PKs
+# that engines reject at load.
+
+profiles:
+  key_fleet_default:
+    # Redirect granularity. Every domain decides per sale identity (ticket/
+    # order number) EXCEPT the domains listed here, which decide per key VALUE:
+    # a customer is either absorbed by the hot key in every channel or keeps
+    # its complete purchase history. Per-ticket thinning of customers removed
+    # the multi-channel repeat customers the q4/q11/q38/q74 family depends on
+    # (SF10: customers active in all three channels in two consecutive years
+    # 1,968 -> 6); per-customer redirection keeps the same column-level hot-key
+    # share (the WorkloadLens/Redshift calibration target) with intact histories.
+    entity_domains: [customer]
+    # Medium/default tier: fleet-derived, but CAPPED at 0.85 -- unlike payload
+    # columns, fact-FK domains conjoin multiplicatively (a row escaping k hot
+    # domains survives with prod(1-f1_k)); with the uncapped fleet table four
+    # store-channel domains drew f1 >= 0.95 and the joint survivor mass fell to
+    # ~5e-8, emptying 15/113 queries. The fleet's extreme [0.90, 0.99) mass is
+    # carried by the MCV axis instead (mcv_fleet_scoped), where columns do not
+    # conjoin. Calibration iteration 4 (2026-09-01).
+    max_value_buckets:
+      - weight: 0.05
+        min: 0.01
+        max: 0.10
+      - weight: 0.10
+        min: 0.10
+        max: 0.30
+      - weight: 0.20
+        min: 0.30
+        max: 0.50
+      - weight: 0.40
+        min: 0.50
+        max: 0.70
+      - weight: 0.25
+        min: 0.70
+        max: 0.80
+    # Date-family domains stay VANILLA in the default tier (cap 0.0 = never
+    # redirected): nearly every template filters a date window, and the
+    # buy->return->re-buy chain templates (q25/q29/q81) hop across several date
+    # FKs whose independent redirects multiply into empty results. Design rule
+    # (2026-09-02): the default workload must have ZERO empty results; not every
+    # domain needs skew -- the key-skew story runs on customer/store/demo/addr/
+    # promo/warehouse/page keys, dates keep their natural distribution.
+    # (Tested waypoints: uncapped -> 15 newly-empty; caps 0.60 -> 3; vanilla -> target 0.
+    # key_high may still skew dates as a stress tier.)
+    domain_caps:
+      date: 0.0
+      ship_date: 0.0
+      return_date: 0.0
+      return_time: 0.0
+      time: 0.0
+    # (A catalog.customer blacklist was briefly carried here under the theory
+    # that the hot catalog customer poisons per-state return averages for the
+    # q81 family. Root-causing showed the actual culprit was MCV saturation
+    # collapsing cr_return_amt_inc_tax onto a single 0.00 value -- fixed by the
+    # shared retention floor -- while one large customer among ~30k per state
+    # shifts the average only ~5%. The blacklist was removed again; the
+    # empirical gate re-verifies q81 on every calibration change.)
+
+  key_low:
+    entity_domains: [customer]
+    # Date-family domains stay vanilla in EVERY tier (same column set as the default
+    # tier; the tier sets intensity, not which domains are skewed).
+    domain_caps:
+      date: 0.0
+      ship_date: 0.0
+      return_date: 0.0
+      return_time: 0.0
+      time: 0.0
+    # Low tier: mild key skew, capped like the default tier.
+    max_value_buckets:
+      - weight: 0.30
+        min: 0.01
+        max: 0.10
+      - weight: 0.30
+        min: 0.10
+        max: 0.30
+      - weight: 0.25
+        min: 0.30
+        max: 0.50
+      - weight: 0.12
+        min: 0.50
+        max: 0.70
+      - weight: 0.03
+        min: 0.70
+        max: 0.80
+
+  key_high:
+    entity_domains: [customer]
+    # Date-family domains stay vanilla in EVERY tier (same column set as the default
+    # tier; the tier sets intensity, not which domains are skewed).
+    domain_caps:
+      date: 0.0
+      ship_date: 0.0
+      return_date: 0.0
+      return_time: 0.0
+      time: 0.0
+    # High tier: bucket table identical to mcv_high. Use with care -- targets
+    # near 0.99 concentrate almost a whole channel on one key.
+    max_value_buckets:
+      - weight: 0.01
+        min: 0.01
+        max: 0.10
+      - weight: 0.03
+        min: 0.10
+        max: 0.30
+      - weight: 0.06
+        min: 0.30
+        max: 0.50
+      - weight: 0.25
+        min: 0.50
+        max: 0.70
+      - weight: 0.30
+        min: 0.70
+        max: 0.90
+      - weight: 0.35
+        min: 0.90
+        max: 0.99

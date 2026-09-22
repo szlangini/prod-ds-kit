@@ -36,6 +36,10 @@
  define YEAR = random(1998,2000,uniform);
  define VEHCNT=random(-1,4,uniform);
  define _LIMIT=1000;
+define SCITYNUM = ulist(random(1, rowcount("active_cities", "store"), uniform), 3);
+define SCITY_A = distmember(cities, [SCITYNUM.1], 1);
+define SCITY_B = distmember(cities, [SCITYNUM.2], 1);
+define SCITY_C = distmember(cities, [SCITYNUM.3], 1);
  
 [_LIMITA] select [_LIMITB]
  c_last_name,c_first_name,substr(s_city,1,30),ss_ticket_number,profit
@@ -61,7 +65,7 @@
     and household_demographics.hd_buy_potential in ('1001-5000','501-1000','>10000')
     and date_dim.d_dow = 1
     and date_dim.d_year in ([YEAR],[YEAR]+1,[YEAR]+2) 
-    and store.s_city in ('Seattle','Atlanta','Denver')
+    and store.s_city in ('[SCITY_A]','[SCITY_B]','[SCITY_C]')
     and store.s_market_desc is not null
     group by ss_ticket_number,ss_customer_sk,ss_addr_sk,store.s_city) ms,customer
     where ss_customer_sk = c_customer_sk

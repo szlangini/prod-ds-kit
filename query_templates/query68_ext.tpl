@@ -39,6 +39,7 @@
  define CITY_A = distmember(cities, [CITYNUMBER.1], 1);
  define CITY_B = distmember(cities, [CITYNUMBER.2], 1);
  define _LIMIT=1000;
+define BCOUNTRY = ulist(dist(countries, 1, 1), 2);
  
  [_LIMITA] select [_LIMITB] c_last_name
        ,c_first_name
@@ -88,7 +89,7 @@
    and current_addr.ca_country = 'United States'
    and current_addr.ca_state in ('CA','WA','GA','TX')
    and current_addr.ca_city is not null
-   and c_birth_country in ('United States','Canada')
+   and c_birth_country in ('[BCOUNTRY.1]','[BCOUNTRY.2]')
  group by c_last_name
          ,c_first_name
          ,ca_city
