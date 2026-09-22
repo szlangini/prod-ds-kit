@@ -36,7 +36,7 @@ COLUMNS = {"sparsity_only": 101, "skew_only": 101, "combined": 101,
            "keyskew_only": 28, "skew_all": 129, "full": 129}
 HOTPATH = {"sparsity_only": "0\\%", "skew_only": "0\\%", "combined": "0\\%",
            "keyskew_only": "100\\%", "skew_all": "22\\%", "full": "22\\%"}
-# Paper table (Table 5): the two production axes and their combination. Value skew (MCV)
+# Paper table (Table 6, Sec 6.9): the two production axes and their combination. Value skew (MCV)
 # and key skew are ONE axis -- skewed value distributions across column roles -- split only
 # by mechanism, so they are reported together (variant skew_all = MCV + key, NULL off).
 PAPER_ROWS = [("sparsity_only", "(A) Sparsity only"),

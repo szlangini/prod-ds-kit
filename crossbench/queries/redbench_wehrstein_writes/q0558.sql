@@ -1,0 +1,1 @@
+DELETE FROM movie_info_idx             WHERE id = '1241589' AND movie_id = '2379658' AND info_type_id = '99' AND info = '1...1...16' AND note IS NULL; INSERT INTO movie_info_idx (id, movie_id, info_type_id, info, note)             VALUES ('1241589', '2379658', '99', '1...1...16', NULL);

@@ -1,0 +1,1 @@
+DELETE FROM info_type             WHERE id = '57' AND info = 'LD release country'; INSERT INTO info_type (id, info)             VALUES ('57', 'LD release country');

@@ -1,0 +1,1 @@
+DELETE FROM role_type             WHERE id = '7' AND role = 'costume designer'; INSERT INTO role_type (id, role)             VALUES ('7', 'costume designer');

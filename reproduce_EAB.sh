@@ -55,13 +55,15 @@
 #  ---- 6. Input data ---------------------------------------------------------
 #     Generated (not downloaded): TPC-DS dsdgen + Prod-DS generator
 #     (wrap_dsdgen.py: stringification / MCV-skew / NULL-sparsity). Idempotent.
-#     The cross-benchmark CDF additionally needs small external latency CSVs for
-#     the OTHER suites (experiments/data/s7_cdf/); that figure is skipped if absent.
+#     The HISTORICAL cross-benchmark CDF (experiments/plot_cdf_crossbench.py) needs
+#     small external latency CSVs for the OTHER suites (experiments/data/s7_cdf/);
+#     it is skipped if absent. Paper FIGURE 9 is NOT that figure -- it is rendered
+#     from crossbench/ and needs nothing from a run; see below.
 #
 #  ---- 7. Measurement protocol / determinism ---------------------------------
 #     threads=56 · per-query timeout=1800 s · WARMUP=1 (first query of each suite
 #     once, untimed) + REPS=10 timed repetitions, MEDIAN reported. This is the
-#     paper protocol (Sec 6.2) and
+#     paper protocol (Sec 6.2 hardware/environment, Sec 6.4 methodology) and
 #     matches REPRODUCIBILITY.md exactly. --quick forces REPS=1. Data-gen is
 #     seeded. Committee criterion = BEHAVIORAL agreement (same trends / cliffs /
 #     failure modes), not exact milliseconds.
@@ -69,12 +71,16 @@
 #  ---- 8. Outputs (in-repo generator filenames) ------------------------------
 #     Filenames are LEGACY and do NOT match the paper's numbering; the paper
 #     crosswalk is in REPRODUCIBILITY.md. Experiment -> generated file [paper]:
-#     E1 -> fig8a/b/c, fig9/fig9b (CDF), fig10 (errors), cross-bench CDF [Fig 7, Fig 8, Table 4]
-#     E2 -> fig11 (join exec+planning, x-failure markers)               [Fig 10]
-#     E3 -> fig12 (union pow2 U2..U2048, x-failure markers)             [Fig 11]
-#     E4 -> fig13 (STR quantile fan + STRLEN), DuckDB at SF10           [Fig 9]
+#     E1 -> fig8a/b/c, fig9/fig9b (CDF), fig10 (errors)   [Fig 7, Fig 8, Table 5]
+#     E2 -> fig11 (join exec+planning, x-failure markers)               [Fig 11]
+#     E3 -> fig12 (union pow2 U2..U2048, x-failure markers)             [Fig 12]
+#     E4 -> fig13 (STR quantile fan + STRLEN), DuckDB at SF10           [Fig 10]
 #     E4X-> fig_str_crossengine (cross-engine stringification; NOT in the paper)
-#     E5 -> table3 (skew bars) + table_skew_nullity_tiers.tex          [Table 5]
+#     E5 -> table3 (skew bars) + table_skew_nullity_tiers.tex          [Table 6]
+#     Note the two ladders' file numbers coincide with the paper by accident;
+#     fig13 is Figure 10, fig10_error_breakdown is Table 5, table3 is Table 6.
+#     NOT produced here: Figure 9 (crossbench/, see the 'figure9' target) and the
+#     Sec 6.7 compilation-estimate paragraph (compilation/).
 #     All rendered by IN-REPO generators (experiments/plot_results.py,
 #     plot_str_crossengine.py, make_skew_table.py, plot_cdf_crossbench.py) from
 #     .reproduce/sf*/results/ into eab_artifact/{figures,tables}/ (PNG + PDF).
@@ -200,7 +206,14 @@ phase_figures(){ M "PHASE FIGURES — render all figures + tables (in-repo) -> $
     "$PY" experiments/plot_str_crossengine.py --results-dir "$rdir" --output-dir "$FIGD" >>"$fl" 2>&1 || warn "str_crossengine sf${sc}"
     "$PY" experiments/make_skew_table.py      --repo "$ROOT" --sf "$sc" --tiers --out "$TABD/table_skew_nullity.tex" >>"$fl" 2>&1 || warn "skew tier table sf${sc}"
   done
-  "$PY" experiments/plot_cdf_crossbench.py --output-dir "$FIGD" >>"$fl" 2>&1 || warn "cross-bench CDF (needs experiments/data/s7_cdf CSVs)"
+  # HISTORICAL, kept for the record: an earlier cross-benchmark experiment over
+  # experiments/data/s7_cdf/, not run under the ten-pass protocol. This is NOT paper Figure 9.
+  "$PY" experiments/plot_cdf_crossbench.py --output-dir "$FIGD" >>"$fl" 2>&1 || warn "historical cross-bench CDF (needs experiments/data/s7_cdf CSVs)"
+  # Paper FIGURE 9: rendered from its own recorded measurements, no run required.
+  ( cd "$ROOT/crossbench" && "$PY" make_cdf_figure_final.py ) >>"$fl" 2>&1 \
+      && cp "$ROOT/crossbench/figures/cdf_crossbench_paper.pdf" "$FIGD/" \
+      && cp "$ROOT/crossbench/figures/cdf_crossbench_paper.png" "$FIGD/" \
+      || warn "paper Figure 9 (crossbench/)"
   note "figures: $(ls "$FIGD"/*.pdf 2>/dev/null|wc -l) PDFs · tables: $(ls "$TABD"/*.tex 2>/dev/null|wc -l)"; }
 
 # ---- main -------------------------------------------------------------------
@@ -218,7 +231,17 @@ phase_E0(){ local s seen=""
     # so the audit is untimed regardless of what --reps was given here.
     for e in $ENGINES; do run_one E0 "$e" "$s"; done
   done; }
-run_all(){ phase_E0; phase_E1; phase_E2; phase_E3; phase_E4; phase_E4X; phase_E5; phase_figures; }
+phase_figure9(){ M "PHASE FIGURE 9 — cross-benchmark runtime CDF, from crossbench/ (no run needed)"
+  mkdir -p "$FIGD"
+  # The accepted Figure 9 carries its own measurement records, so this needs neither a loaded
+  # database nor an engine -- only matplotlib. experiments/plot_cdf_crossbench.py is a DIFFERENT,
+  # historical experiment and is not this figure.
+  ( cd "$ROOT/crossbench" && "$PY" make_cdf_figure_final.py && "$PY" verify_cdf_exports.py ) \
+    && cp "$ROOT/crossbench/figures/cdf_crossbench_paper".{pdf,png} "$FIGD/" \
+    && note "Figure 9 -> $FIGD/cdf_crossbench_paper.pdf" \
+    || warn "paper Figure 9 (crossbench/)"; }
+
+run_all(){ phase_E0; phase_E1; phase_E2; phase_E3; phase_E4; phase_E4X; phase_E5; phase_figures; phase_figure9; }
 summary(){ M "RUN COMPLETE — artifact in $EAB"
   if [ "${#FAILS[@]}" -gt 0 ]; then warn "${#FAILS[@]} unit(s) non-zero:"; printf '         - %s\n' "${FAILS[@]}"|tee -a "$RUN_LOG"
     note "(a non-zero unit can BE the result: MonetDB timeout / CedarDB OOM — check its log)"
@@ -238,9 +261,10 @@ case "$TARGET" in
   E0) phase_E0 ;;
   E1) phase_E1 ;; E2) phase_E2 ;; E3) phase_E3 ;; E4) phase_E4 ;; E4X) phase_E4X ;; E5) phase_E5 ;;
   figures) phase_figures ;;
+  figure9) phase_figure9 ;;
   clean) M "CLEAN — removing results + artifact (data kept)"; clean_monetdb_daemons; rm -rf "$RAW"/sf*/results "$EAB"; echo "       done"; exit 0 ;;
   clean-data) M "CLEAN-DATA — freeing regenerable variant data (str_sweep + sparsity, all SF; base + results kept)"; rm -rf "$RAW"/sf*/data/str_sweep "$RAW"/sf*/data/sparsity; echo "       done (base tpcds/prodds + results kept; variants regenerated on next --init)"; exit 0 ;;
   purge) M "PURGE — full reset: ALL data + databases + results + artifact (engine binaries kept)"; clean_monetdb_daemons; rm -rf "$RAW"/sf*/data "$RAW"/sf*/databases "$RAW"/sf*/results "$EAB"; echo "       done (everything regenerable; rerun with --init)"; exit 0 ;;
-  *) die "unknown target '$TARGET' (valid: all E1 E2 E3 E4 E4X E5 figures clean clean-data purge; prefix --quick)" ;;
+  *) die "unknown target '$TARGET' (valid: all E1 E2 E3 E4 E4X E5 figures figure9 clean clean-data purge; prefix --quick)" ;;
 esac
 summary

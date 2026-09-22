@@ -1,0 +1,1 @@
+DELETE FROM info_type             WHERE id = '53' AND info = 'LD color rendition'; INSERT INTO info_type (id, info)             VALUES ('53', 'LD color rendition');

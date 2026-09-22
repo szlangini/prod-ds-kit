@@ -24,6 +24,17 @@ formulas, and worked examples from the paper appendices:
 | -- | [docs/dialect-adaptations.md](docs/dialect-adaptations.md) | Per-engine SQL rewrites for DuckDB, CedarDB, MonetDB; adding a new dialect |
 | -- | [docs/reproducibility.md](docs/reproducibility.md) | What `reproduce.sh` does step by step, and what each flag changes |
 
+Two paper results have their own self-contained directories, because `reproduce.sh` does not
+produce them. Both render from recorded measurements with no database, engine or measurement run:
+
+| Result | Directory | Command |
+|---|---|---|
+| **Figure 9** (§6.5), cross-benchmark runtime CDF | [crossbench/](crossbench/) | `cd crossbench && python3 make_cdf_figure_final.py` |
+| **§6.7** CedarDB compilation estimates | [compilation/](compilation/) | `cd compilation && python3 summarize_compilation.py --scale 100` |
+
+`experiments/plot_cdf_crossbench.py` is an **earlier, superseded** cross-benchmark experiment kept
+for the record; it does not produce Figure 9.
+
 ## Quick Start
 
 ```bash

@@ -1,0 +1,1 @@
+DELETE FROM person_info             WHERE id = '533060' AND person_id = '305114' AND info_type_id = '39' AND info = 'Sydney, New South Wales, Australia' AND note IS NULL; INSERT INTO person_info (id, person_id, info_type_id, info, note)             VALUES ('533060', '305114', '39', 'Sydney, New South Wales, Australia', NULL);

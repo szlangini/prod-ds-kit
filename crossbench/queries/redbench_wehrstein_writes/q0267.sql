@@ -1,0 +1,1 @@
+DELETE FROM company_type             WHERE id = '1' AND kind = 'distributors'; INSERT INTO company_type (id, kind)             VALUES ('1', 'distributors');

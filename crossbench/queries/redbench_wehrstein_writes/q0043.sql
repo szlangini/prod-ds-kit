@@ -1,0 +1,1 @@
+DELETE FROM movie_link             WHERE id = '2821' AND movie_id = '11134' AND linked_movie_id = '379413' AND link_type_id = '5'; INSERT INTO movie_link (id, movie_id, linked_movie_id, link_type_id)             VALUES ('2821', '11134', '379413', '5');

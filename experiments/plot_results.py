@@ -54,8 +54,8 @@ SUITE_LABELS = {
     "prodds": "Prod-DS",
 }
 
-# Error categories shown in Fig 10
-# Same taxonomy as the Table 4 CSV (export_paper_csv.py), so figure and table agree.
+# Error categories shown in fig10_error_breakdown (the FILE name; the paper prints this as
+# Table 5, Sec 6.5). Same taxonomy as that CSV in export_paper_csv.py, so the two agree.
 ERROR_CATEGORIES = ["success", "dialect", "failure", "oom", "timeout"]
 ERROR_COLORS = {
     "success": "#4CAF50",
@@ -758,7 +758,7 @@ def plot_fig9b_cdf_engines(summaries: Dict[str, Dict[str, List[Dict[str, Any]]]]
 
 
 def _audit_error_counts(results_dir: Path, timeout_s: float) -> Dict[str, Dict[str, int]]:
-    """Per-engine Prod-DS outcome counts from the E0 audit, with the Table 4 taxonomy.
+    """Per-engine Prod-DS outcome counts from the E0 audit, with the Table 5 taxonomy.
 
     Under the audit-first protocol E1 runs the common subset only, where every query
     succeeds by construction, so counting E1 statuses would report zero failures for every

@@ -1,0 +1,1 @@
+DELETE FROM keyword             WHERE id = '92641' AND keyword = 'clueless-detective' AND phonetic_code = 'C4232'; INSERT INTO keyword (id, keyword, phonetic_code)             VALUES ('92641', 'clueless-detective', 'C4232');

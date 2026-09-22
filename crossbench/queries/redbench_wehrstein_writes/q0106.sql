@@ -1,0 +1,1 @@
+DELETE FROM comp_cast_type             WHERE id = '2' AND kind = 'crew'; INSERT INTO comp_cast_type (id, kind)             VALUES ('2', 'crew');

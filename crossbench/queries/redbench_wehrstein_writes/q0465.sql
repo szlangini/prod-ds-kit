@@ -1,0 +1,1 @@
+DELETE FROM person_info             WHERE id = '1739631' AND person_id = '1000007' AND info_type_id = '20' AND info = 'Asnières-sur-Seine, Hauts-de-Seine, France' AND note IS NULL; INSERT INTO person_info (id, person_id, info_type_id, info, note)             VALUES ('1739631', '1000007', '20', 'Asnières-sur-Seine, Hauts-de-Seine, France', NULL);

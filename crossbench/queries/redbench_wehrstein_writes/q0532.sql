@@ -1,0 +1,1 @@
+DELETE FROM movie_keyword             WHERE id = '1458217' AND movie_id = '1787659' AND keyword_id = '643'; INSERT INTO movie_keyword (id, movie_id, keyword_id)             VALUES ('1458217', '1787659', '643');

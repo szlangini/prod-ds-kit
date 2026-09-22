@@ -1,0 +1,1 @@
+DELETE FROM person_info             WHERE id = '1982270' AND person_id = '1145848' AND info_type_id = '17' AND info = '2000 Olympic gold medalist, Equestrian Individual.' AND note IS NULL; INSERT INTO person_info (id, person_id, info_type_id, info, note)             VALUES ('1982270', '1145848', '17', '2000 Olympic gold medalist, Equestrian Individual.', NULL);

@@ -1,0 +1,1 @@
+DELETE FROM person_info             WHERE id = '2544213' AND person_id = '2562077' AND info_type_id = '29' AND info = 'Danielle Staub. _The Naked Truth._ 2010.' AND note IS NULL; INSERT INTO person_info (id, person_id, info_type_id, info, note)             VALUES ('2544213', '2562077', '29', 'Danielle Staub. _The Naked Truth._ 2010.', NULL);

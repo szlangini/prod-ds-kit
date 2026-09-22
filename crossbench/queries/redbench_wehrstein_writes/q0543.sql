@@ -1,0 +1,1 @@
+DELETE FROM info_type             WHERE id = '56' AND info = 'LD video artifacts'; INSERT INTO info_type (id, info)             VALUES ('56', 'LD video artifacts');

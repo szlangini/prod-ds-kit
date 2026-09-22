@@ -1,0 +1,1 @@
+DELETE FROM movie_companies             WHERE id = '1091092' AND movie_id = '2358112' AND company_id = '12509' AND company_type_id = '1' AND note = '(2011) (Hong Kong) (DVD) (Blu-ray)'; INSERT INTO movie_companies (id, movie_id, company_id, company_type_id, note)             VALUES ('1091092', '2358112', '12509', '1', '(2011) (Hong Kong) (DVD) (Blu-ray)');

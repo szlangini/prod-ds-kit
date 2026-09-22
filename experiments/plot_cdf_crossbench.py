@@ -1,5 +1,19 @@
 #!/usr/bin/env python3
-"""Cross-benchmark per-query latency CDF, in the SAME paper style as plot_results.py
+"""HISTORICAL cross-benchmark latency CDF — superseded, and NOT paper Figure 9.
+
+Kept for the record. This is an earlier cross-benchmark experiment: it draws SF10 across eight
+suites and SF100 across five scalable ones from the per-query latency CSVs in
+experiments/data/s7_cdf/, and it was not run under the ten timed passes the paper reports.
+
+**Paper Figure 9 (Sec 6.5) comes from `crossbench/`**, a different pipeline with its own
+measurement records, eight curves, instance weighting and both Prod-DS populations:
+
+    cd crossbench && python3 make_cdf_figure_final.py
+
+Do not present this script's output as Figure 9, and do not mix its populations with that one's.
+Its outputs (fig_cdf_latency_sf10, fig_cdf_latency_sf100_scalable) keep their own names.
+
+Cross-benchmark per-query latency CDF, in the SAME paper style as plot_results.py
 (imports apply_style/save_fig/HEIGHT_SCALE). One step-line per benchmark SUITE, Prod-DS
 emphasised. Two figures: SF10 (all 8 suites, matched ~2-15 GB) and SF100 (5 scalable suites).
 Fed from the s7_cdf latency CSVs + the E1 SF100 prodds/tpcds summaries.

@@ -1,0 +1,109 @@
+suite,scale_factor,mode,mode_name,repetition,query_id,stage,elapsed_ms,status
+prodds,100,i,Interpreted,1,query_39,prepare,6.435,ok
+prodds,100,i,Interpreted,1,query_39,execute,417.241,ok
+prodds,100,i,Interpreted,1,query_95,prepare,5.637,ok
+prodds,100,i,Interpreted,1,query_95,execute,734.207,ok
+prodds,100,i,Interpreted,1,query_49,prepare,4.515,ok
+prodds,100,i,Interpreted,1,query_49,execute,711.895,ok
+prodds,100,i,Interpreted,1,query_6,prepare,8.862,ok
+prodds,100,i,Interpreted,1,query_6,execute,2173.932,ok
+prodds,100,i,Interpreted,1,query_54,prepare,2.784,ok
+prodds,100,i,Interpreted,1,query_54,execute,10821.280,ok
+prodds,100,i,Interpreted,1,query_union_U5,prepare,4.450,ok
+prodds,100,i,Interpreted,1,query_union_U5,execute,2208.355,ok
+prodds,100,i,Interpreted,2,query_39,prepare,7.363,ok
+prodds,100,i,Interpreted,2,query_39,execute,102.477,ok
+prodds,100,i,Interpreted,2,query_95,prepare,5.327,ok
+prodds,100,i,Interpreted,2,query_95,execute,289.921,ok
+prodds,100,i,Interpreted,2,query_49,prepare,3.669,ok
+prodds,100,i,Interpreted,2,query_49,execute,402.136,ok
+prodds,100,i,Interpreted,2,query_6,prepare,7.066,ok
+prodds,100,i,Interpreted,2,query_6,execute,672.740,ok
+prodds,100,i,Interpreted,2,query_54,prepare,2.720,ok
+prodds,100,i,Interpreted,2,query_54,execute,10400.821,ok
+prodds,100,i,Interpreted,2,query_union_U5,prepare,4.127,ok
+prodds,100,i,Interpreted,2,query_union_U5,execute,2216.857,ok
+prodds,100,i,Interpreted,3,query_39,prepare,11.025,ok
+prodds,100,i,Interpreted,3,query_39,execute,89.120,ok
+prodds,100,i,Interpreted,3,query_95,prepare,5.350,ok
+prodds,100,i,Interpreted,3,query_95,execute,279.598,ok
+prodds,100,i,Interpreted,3,query_49,prepare,3.978,ok
+prodds,100,i,Interpreted,3,query_49,execute,367.945,ok
+prodds,100,i,Interpreted,3,query_6,prepare,7.951,ok
+prodds,100,i,Interpreted,3,query_6,execute,662.858,ok
+prodds,100,i,Interpreted,3,query_54,prepare,2.787,ok
+prodds,100,i,Interpreted,3,query_54,execute,10175.871,ok
+prodds,100,i,Interpreted,3,query_union_U5,prepare,4.209,ok
+prodds,100,i,Interpreted,3,query_union_U5,execute,2205.738,ok
+prodds,100,A,Auto (default),1,query_39,prepare,11.298,ok
+prodds,100,A,Auto (default),1,query_39,execute,63.591,ok
+prodds,100,A,Auto (default),1,query_95,prepare,5.607,ok
+prodds,100,A,Auto (default),1,query_95,execute,106.680,ok
+prodds,100,A,Auto (default),1,query_49,prepare,3.758,ok
+prodds,100,A,Auto (default),1,query_49,execute,223.986,ok
+prodds,100,A,Auto (default),1,query_6,prepare,8.133,ok
+prodds,100,A,Auto (default),1,query_6,execute,408.841,ok
+prodds,100,A,Auto (default),1,query_54,prepare,3.186,ok
+prodds,100,A,Auto (default),1,query_54,execute,3209.157,ok
+prodds,100,A,Auto (default),1,query_union_U5,prepare,4.322,ok
+prodds,100,A,Auto (default),1,query_union_U5,execute,2017.467,ok
+prodds,100,A,Auto (default),2,query_39,prepare,10.611,ok
+prodds,100,A,Auto (default),2,query_39,execute,71.557,ok
+prodds,100,A,Auto (default),2,query_95,prepare,5.467,ok
+prodds,100,A,Auto (default),2,query_95,execute,106.651,ok
+prodds,100,A,Auto (default),2,query_49,prepare,3.729,ok
+prodds,100,A,Auto (default),2,query_49,execute,221.259,ok
+prodds,100,A,Auto (default),2,query_6,prepare,8.098,ok
+prodds,100,A,Auto (default),2,query_6,execute,406.236,ok
+prodds,100,A,Auto (default),2,query_54,prepare,3.100,ok
+prodds,100,A,Auto (default),2,query_54,execute,3274.974,ok
+prodds,100,A,Auto (default),2,query_union_U5,prepare,4.372,ok
+prodds,100,A,Auto (default),2,query_union_U5,execute,1993.698,ok
+prodds,100,A,Auto (default),3,query_39,prepare,7.728,ok
+prodds,100,A,Auto (default),3,query_39,execute,69.731,ok
+prodds,100,A,Auto (default),3,query_95,prepare,5.480,ok
+prodds,100,A,Auto (default),3,query_95,execute,114.572,ok
+prodds,100,A,Auto (default),3,query_49,prepare,3.807,ok
+prodds,100,A,Auto (default),3,query_49,execute,243.603,ok
+prodds,100,A,Auto (default),3,query_6,prepare,7.848,ok
+prodds,100,A,Auto (default),3,query_6,execute,414.418,ok
+prodds,100,A,Auto (default),3,query_54,prepare,2.911,ok
+prodds,100,A,Auto (default),3,query_54,execute,3085.298,ok
+prodds,100,A,Auto (default),3,query_union_U5,prepare,4.365,ok
+prodds,100,A,Auto (default),3,query_union_U5,execute,2034.423,ok
+prodds,100,o,Optimized,1,query_39,prepare,266.233,ok
+prodds,100,o,Optimized,1,query_39,execute,75.718,ok
+prodds,100,o,Optimized,1,query_95,prepare,248.650,ok
+prodds,100,o,Optimized,1,query_95,execute,124.509,ok
+prodds,100,o,Optimized,1,query_49,prepare,128.120,ok
+prodds,100,o,Optimized,1,query_49,execute,241.036,ok
+prodds,100,o,Optimized,1,query_6,prepare,339.591,ok
+prodds,100,o,Optimized,1,query_6,execute,410.749,ok
+prodds,100,o,Optimized,1,query_54,prepare,135.872,ok
+prodds,100,o,Optimized,1,query_54,execute,3391.973,ok
+prodds,100,o,Optimized,1,query_union_U5,prepare,58.679,ok
+prodds,100,o,Optimized,1,query_union_U5,execute,2033.015,ok
+prodds,100,o,Optimized,2,query_39,prepare,273.139,ok
+prodds,100,o,Optimized,2,query_39,execute,145.472,ok
+prodds,100,o,Optimized,2,query_95,prepare,246.102,ok
+prodds,100,o,Optimized,2,query_95,execute,183.128,ok
+prodds,100,o,Optimized,2,query_49,prepare,127.029,ok
+prodds,100,o,Optimized,2,query_49,execute,249.861,ok
+prodds,100,o,Optimized,2,query_6,prepare,336.207,ok
+prodds,100,o,Optimized,2,query_6,execute,412.754,ok
+prodds,100,o,Optimized,2,query_54,prepare,135.904,ok
+prodds,100,o,Optimized,2,query_54,execute,3055.549,ok
+prodds,100,o,Optimized,2,query_union_U5,prepare,59.157,ok
+prodds,100,o,Optimized,2,query_union_U5,execute,2048.324,ok
+prodds,100,o,Optimized,3,query_39,prepare,273.184,ok
+prodds,100,o,Optimized,3,query_39,execute,77.465,ok
+prodds,100,o,Optimized,3,query_95,prepare,247.336,ok
+prodds,100,o,Optimized,3,query_95,execute,112.956,ok
+prodds,100,o,Optimized,3,query_49,prepare,127.881,ok
+prodds,100,o,Optimized,3,query_49,execute,226.273,ok
+prodds,100,o,Optimized,3,query_6,prepare,336.524,ok
+prodds,100,o,Optimized,3,query_6,execute,445.405,ok
+prodds,100,o,Optimized,3,query_54,prepare,136.385,ok
+prodds,100,o,Optimized,3,query_54,execute,3122.742,ok
+prodds,100,o,Optimized,3,query_union_U5,prepare,58.796,ok
+prodds,100,o,Optimized,3,query_union_U5,execute,2038.030,ok

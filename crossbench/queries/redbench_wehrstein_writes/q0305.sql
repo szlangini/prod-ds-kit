@@ -1,0 +1,1 @@
+DELETE FROM info_type             WHERE id = '37' AND info = 'magazine cover photo'; INSERT INTO info_type (id, info)             VALUES ('37', 'magazine cover photo');

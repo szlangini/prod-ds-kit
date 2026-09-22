@@ -1,0 +1,13 @@
+SELECT cc.status_id,
+       COUNT(*) AS total_count
+FROM complete_cast cc
+JOIN movie_info mi ON cc.movie_id = mi.movie_id
+AND mi.info_type_id = '54'
+WHERE cc.id >= '21'
+  AND cc.id <= '289'
+  AND cc.status_id = '3'
+  AND cc.id >
+    (SELECT AVG(id)
+     FROM complete_cast
+     WHERE id >= '21')
+GROUP BY cc.status_id;

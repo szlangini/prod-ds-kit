@@ -1,0 +1,12 @@
+SELECT n.id,
+       n.name,
+       n.imdb_id,
+       COUNT(c.id) AS cast_count
+FROM name n
+JOIN cast_info c ON n.id = c.person_id
+WHERE n.id BETWEEN '328' AND '357'
+  AND n.gender = 'm'
+  AND c.role_id = '7'
+GROUP BY n.id,
+         n.name,
+         n.imdb_id;

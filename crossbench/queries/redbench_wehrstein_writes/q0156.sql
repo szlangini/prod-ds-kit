@@ -1,0 +1,1 @@
+DELETE FROM link_type             WHERE id = '8' AND link = 'spoofed in'; INSERT INTO link_type (id, link)             VALUES ('8', 'spoofed in');

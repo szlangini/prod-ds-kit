@@ -1,0 +1,1 @@
+DELETE FROM info_type             WHERE id = '76' AND info = 'LD master format'; INSERT INTO info_type (id, info)             VALUES ('76', 'LD master format');

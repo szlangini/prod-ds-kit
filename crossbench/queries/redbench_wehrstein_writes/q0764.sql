@@ -1,0 +1,1 @@
+DELETE FROM movie_companies             WHERE id = '1039250' AND movie_id = '2310575' AND company_id = '461' AND company_type_id = '1' AND note = '(2002) (Netherlands) (DVD) (VHS)'; INSERT INTO movie_companies (id, movie_id, company_id, company_type_id, note)             VALUES ('1039250', '2310575', '461', '1', '(2002) (Netherlands) (DVD) (VHS)');

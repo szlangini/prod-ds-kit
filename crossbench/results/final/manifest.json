@@ -1,0 +1,302 @@
+{
+  "experiment": "cross-benchmark per-query runtime CDF (final)",
+  "benchmark_identification": "docs/10-crossbench-benchmarks.md (fixed before this run)",
+  "protocol": "read suites: 1 untimed warmup pass, then 10 timed sequential passes, pass-major (every query once per pass, fixed order); write suites: 1 timed pass on a scratch copy, no warmup",
+  "measured": "wall clock from submitting the query to the complete result being materialised in the client (execute + fetchall)",
+  "aggregation": "per query: median over the timed passes in which it succeeded; the main CDF keeps only queries that succeeded in ALL timed passes",
+  "timed_passes": 10,
+  "warmup_passes": 1,
+  "engine": "duckdb 1.4.4",
+  "threads": 56,
+  "memory_limit": "700GB",
+  "per_query_timeout_s": 300.0,
+  "timeout_semantics": "censored observation; never recorded as a successful run",
+  "started": "2026-09-16 12:23:18 BST",
+  "host": "helios",
+  "kernel": "7.0.0-30-generic",
+  "cpu_count": 112,
+  "python": "3.12.3",
+  "suites": {
+    "prodds": {
+      "kind": "read",
+      "label": "Prod-DS (default)",
+      "note": "Prod-DS SF10 current default: STR=5, NULL sparsity, MCV value skew, key skew.",
+      "database": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/databases/duckdb/prodds_sf10_str5.duckdb",
+      "database_bytes": 8475914240,
+      "source_data": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/data/prodds_sf10_str5",
+      "source_data_bytes": {
+        "logical": 12272837471,
+        "on_disk": 5096428544
+      },
+      "note_size": "Sizes of the SOURCE FILES before loading. logical = uncompressed bytes; on_disk = filesystem footprint after ZFS compression. NEITHER is bytes scanned by a query: what an engine reads depends on its storage format, its compression and the columns a query touches, none of which was measured.",
+      "query_dir": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/queries/duckdb/prodds",
+      "n_queries": 107,
+      "passes_timed": 10,
+      "warmup_passes": 1,
+      "instance_weights": false,
+      "total_instances": 107,
+      "measured_pass_wall_s": {
+        "1": 429.109,
+        "2": 428.412,
+        "3": 427.447,
+        "4": 426.989,
+        "5": 431.592,
+        "6": 427.033,
+        "7": 429.876,
+        "8": 432.313,
+        "9": 427.734,
+        "10": 428.694
+      },
+      "settings_verified": {
+        "threads": "56",
+        "memory_limit": "651.9 GiB"
+      },
+      "reconnects": 0
+    },
+    "tpcds": {
+      "kind": "read",
+      "label": "TPC-DS",
+      "note": "Vanilla TPC-DS SF10 from the same generator run as the Prod-DS database.",
+      "database": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/databases/duckdb/tpcds_sf10.duckdb",
+      "database_bytes": 8115466240,
+      "source_data": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/data/tpcds_sf10",
+      "source_data_bytes": {
+        "logical": 12194735029,
+        "on_disk": 6414016512
+      },
+      "note_size": "Sizes of the SOURCE FILES before loading. logical = uncompressed bytes; on_disk = filesystem footprint after ZFS compression. NEITHER is bytes scanned by a query: what an engine reads depends on its storage format, its compression and the columns a query touches, none of which was measured.",
+      "query_dir": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/queries/duckdb/tpcds",
+      "n_queries": 99,
+      "passes_timed": 10,
+      "warmup_passes": 1,
+      "instance_weights": false,
+      "total_instances": 99,
+      "measured_pass_wall_s": {
+        "1": 13.2,
+        "2": 13.385,
+        "3": 13.174,
+        "4": 13.344,
+        "5": 13.049,
+        "6": 13.342,
+        "7": 13.469,
+        "8": 13.146,
+        "9": 13.362,
+        "10": 13.371
+      },
+      "settings_verified": {
+        "threads": "56",
+        "memory_limit": "651.9 GiB"
+      },
+      "reconnects": 0
+    },
+    "dsb": {
+      "kind": "read",
+      "label": "DSB",
+      "note": "microsoft/DSB ec9a156, 52 templates x STREAMS=2 = 104 instances, SF10.",
+      "database": "/home/jvs34/PROD-DS-Revision-Results/s7_cdf/dbs/sf10_dsb.duckdb",
+      "database_bytes": 3297783808,
+      "source_data": "/home/jvs34/Prod.DS.Revision/Benchmarks/dsb/data",
+      "source_data_bytes": {
+        "logical": 12661955964,
+        "on_disk": 6574659584
+      },
+      "note_size": "Sizes of the SOURCE FILES before loading. logical = uncompressed bytes; on_disk = filesystem footprint after ZFS compression. NEITHER is bytes scanned by a query: what an engine reads depends on its storage format, its compression and the columns a query touches, none of which was measured.",
+      "query_dir": "/home/jvs34/Prod.DS.Revision/Benchmarks/dsb/queries",
+      "n_queries": 104,
+      "passes_timed": 10,
+      "warmup_passes": 1,
+      "instance_weights": false,
+      "total_instances": 104,
+      "measured_pass_wall_s": {
+        "1": 6.422,
+        "2": 6.415,
+        "3": 6.207,
+        "4": 6.323,
+        "5": 6.254,
+        "6": 6.267,
+        "7": 6.637,
+        "8": 6.41,
+        "9": 6.306,
+        "10": 6.3
+      },
+      "settings_verified": {
+        "threads": "56",
+        "memory_limit": "651.9 GiB"
+      },
+      "reconnects": 0
+    },
+    "job": {
+      "kind": "read",
+      "label": "JOB",
+      "note": "Join Order Benchmark on the full IMDb dataset. Not scale-factor driven.",
+      "database": "/home/jvs34/PROD-DS-Revision-Results/s7_cdf/dbs/sf10_job.duckdb",
+      "database_bytes": 1356869632,
+      "source_data": "/home/jvs34/Prod.DS.Revision/Benchmarks/job/data",
+      "source_data_bytes": {
+        "logical": 3880615640,
+        "on_disk": 2158865408
+      },
+      "note_size": "Sizes of the SOURCE FILES before loading. logical = uncompressed bytes; on_disk = filesystem footprint after ZFS compression. NEITHER is bytes scanned by a query: what an engine reads depends on its storage format, its compression and the columns a query touches, none of which was measured.",
+      "query_dir": "/home/jvs34/Prod.DS.Revision/Benchmarks/job/queries",
+      "n_queries": 113,
+      "passes_timed": 10,
+      "warmup_passes": 1,
+      "instance_weights": false,
+      "total_instances": 113,
+      "measured_pass_wall_s": {
+        "1": 8.326,
+        "2": 8.369,
+        "3": 8.445,
+        "4": 8.437,
+        "5": 8.307,
+        "6": 8.493,
+        "7": 8.396,
+        "8": 8.592,
+        "9": 8.518,
+        "10": 8.652
+      },
+      "settings_verified": {
+        "threads": "56",
+        "memory_limit": "651.9 GiB"
+      },
+      "reconnects": 0
+    },
+    "redbench_krid": {
+      "kind": "read",
+      "label": "Redbench (Krid et al.)",
+      "note": "30 released workloads over IMDb (CEB+JOB); 8,784 instances, 763 distinct SQL.",
+      "database": "/home/jvs34/PROD-DS-Revision-Results/s7_cdf/dbs/sf10_job.duckdb",
+      "database_bytes": 1356869632,
+      "source_data": "/home/jvs34/Prod.DS.Revision/Benchmarks/job/data",
+      "source_data_bytes": {
+        "logical": 3880615640,
+        "on_disk": 2158865408
+      },
+      "note_size": "Sizes of the SOURCE FILES before loading. logical = uncompressed bytes; on_disk = filesystem footprint after ZFS compression. NEITHER is bytes scanned by a query: what an engine reads depends on its storage format, its compression and the columns a query touches, none of which was measured.",
+      "query_dir": "/home/jvs34/mr2-cdf-crossbench/queries/redbench_krid",
+      "n_queries": 763,
+      "passes_timed": 10,
+      "warmup_passes": 1,
+      "instance_weights": true,
+      "total_instances": 8784,
+      "measured_pass_wall_s": {
+        "1": 70.99,
+        "2": 70.717,
+        "3": 70.311,
+        "4": 70.282,
+        "5": 70.456,
+        "6": 70.097,
+        "7": 70.206,
+        "8": 70.591,
+        "9": 69.671,
+        "10": 70.536
+      },
+      "settings_verified": {
+        "threads": "56",
+        "memory_limit": "651.9 GiB"
+      },
+      "reconnects": 0
+    },
+    "sqlbarber": {
+      "kind": "read",
+      "label": "SQLBarber",
+      "note": "1,000 queries selected from the released 7,524-query pool by the authors' target cost distribution; see docs/10.",
+      "database": "/home/jvs34/PROD-DS-Revision-Results/s7_cdf/dbs/sf10_job.duckdb",
+      "database_bytes": 1356869632,
+      "source_data": "/home/jvs34/Prod.DS.Revision/Benchmarks/job/data",
+      "source_data_bytes": {
+        "logical": 3880615640,
+        "on_disk": 2158865408
+      },
+      "note_size": "Sizes of the SOURCE FILES before loading. logical = uncompressed bytes; on_disk = filesystem footprint after ZFS compression. NEITHER is bytes scanned by a query: what an engine reads depends on its storage format, its compression and the columns a query touches, none of which was measured.",
+      "query_dir": "/home/jvs34/mr2-cdf-crossbench/queries/sqlbarber",
+      "n_queries": 1000,
+      "passes_timed": 10,
+      "warmup_passes": 1,
+      "instance_weights": false,
+      "total_instances": 1000,
+      "measured_pass_wall_s": {
+        "1": 10.413,
+        "2": 10.371,
+        "3": 11.049,
+        "4": 10.895,
+        "5": 10.642,
+        "6": 10.812,
+        "7": 10.679,
+        "8": 10.434,
+        "9": 10.847,
+        "10": 10.704
+      },
+      "settings_verified": {
+        "threads": "56",
+        "memory_limit": "651.9 GiB"
+      },
+      "reconnects": 0
+    },
+    "redbench_wehrstein_reads": {
+      "kind": "read",
+      "label": "Redbench (Wehrstein et al.), reads only",
+      "note": "Read-only projection: the 62 SELECT queries of a MIXED read/write workload.",
+      "database": "/home/jvs34/PROD-DS-Revision-Results/s7_cdf/dbs/sf10_job.duckdb",
+      "database_bytes": 1356869632,
+      "source_data": "/home/jvs34/Prod.DS.Revision/Benchmarks/job/data",
+      "source_data_bytes": {
+        "logical": 3880615640,
+        "on_disk": 2158865408
+      },
+      "note_size": "Sizes of the SOURCE FILES before loading. logical = uncompressed bytes; on_disk = filesystem footprint after ZFS compression. NEITHER is bytes scanned by a query: what an engine reads depends on its storage format, its compression and the columns a query touches, none of which was measured.",
+      "query_dir": "/home/jvs34/mr2-cdf-crossbench/queries/redbench_wehrstein_reads",
+      "n_queries": 62,
+      "passes_timed": 10,
+      "warmup_passes": 1,
+      "instance_weights": false,
+      "total_instances": 62,
+      "measured_pass_wall_s": {
+        "1": 3.187,
+        "2": 3.222,
+        "3": 3.258,
+        "4": 3.326,
+        "5": 3.274,
+        "6": 3.27,
+        "7": 3.31,
+        "8": 3.286,
+        "9": 3.185,
+        "10": 3.309
+      },
+      "settings_verified": {
+        "threads": "56",
+        "memory_limit": "651.9 GiB"
+      },
+      "reconnects": 0
+    },
+    "redbench_wehrstein_writes": {
+      "kind": "write",
+      "label": "Redbench (Wehrstein et al.), writes only",
+      "note": "The 938 write statements of the same mixed workload. Single pass on a scratch copy; not part of the analytical CDF.",
+      "database": "/home/jvs34/PROD-DS-Revision-Results/s7_cdf/dbs/sf10_redbench.duckdb",
+      "database_bytes": 1359228928,
+      "source_data": "/home/jvs34/Prod.DS.Revision/Benchmarks/redbench/data",
+      "source_data_bytes": {
+        "logical": 3880615640,
+        "on_disk": 2158865408
+      },
+      "note_size": "Sizes of the SOURCE FILES before loading. logical = uncompressed bytes; on_disk = filesystem footprint after ZFS compression. NEITHER is bytes scanned by a query: what an engine reads depends on its storage format, its compression and the columns a query touches, none of which was measured.",
+      "query_dir": "/home/jvs34/mr2-cdf-crossbench/queries/redbench_wehrstein_writes",
+      "n_queries": 938,
+      "passes_timed": 1,
+      "warmup_passes": 0,
+      "instance_weights": false,
+      "total_instances": 938,
+      "measured_pass_wall_s": {
+        "1": 2.509
+      },
+      "settings_verified": {
+        "threads": "56",
+        "memory_limit": "651.9 GiB"
+      },
+      "reconnects": 0
+    }
+  },
+  "finished": "2026-09-16 14:02:48 BST",
+  "note_measured_endpoint": "execute() plus fetchall(): result transfer and client-side materialisation are inside every measured time. Prod-DS's query_union_U200 returns 87,390,461 rows, so its 168.5 s is not an engine-internal execution cost."
+}

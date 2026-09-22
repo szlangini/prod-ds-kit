@@ -1,0 +1,30 @@
+{
+ "what": "the executed SQL for the four core suites, verified against the sha256 recorded beside every latency record in results/final/latencies.csv",
+ "note_job": "JOB 15a-d were executed from queries/patched/job/ (the reserved-alias rename); the unpatched originals are here, and the hash check uses the patched file for those four, which is what ran.",
+ "per_suite": {
+  "prodds": {
+   "files": 107,
+   "hash_matches_latency_record": 107,
+   "no_latency_record": 0,
+   "hash_mismatch": 0
+  },
+  "tpcds": {
+   "files": 99,
+   "hash_matches_latency_record": 99,
+   "no_latency_record": 0,
+   "hash_mismatch": 0
+  },
+  "dsb": {
+   "files": 104,
+   "hash_matches_latency_record": 104,
+   "no_latency_record": 0,
+   "hash_mismatch": 0
+  },
+  "job": {
+   "files": 113,
+   "hash_matches_latency_record": 113,
+   "no_latency_record": 0,
+   "hash_mismatch": 0
+  }
+ }
+}

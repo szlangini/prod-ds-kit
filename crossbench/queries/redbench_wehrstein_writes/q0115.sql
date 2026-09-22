@@ -1,0 +1,1 @@
+DELETE FROM link_type             WHERE id = '1' AND link = 'follows'; INSERT INTO link_type (id, link)             VALUES ('1', 'follows');

@@ -1,0 +1,1 @@
+DELETE FROM info_type             WHERE id = '93' AND info = 'production process protocol'; INSERT INTO info_type (id, info)             VALUES ('93', 'production process protocol');

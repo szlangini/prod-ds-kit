@@ -1,0 +1,1 @@
+DELETE FROM movie_companies             WHERE id = '668574' AND movie_id = '1929733' AND company_id = '181' AND company_type_id = '1' AND note = '(2013) (Japan) (TV)'; INSERT INTO movie_companies (id, movie_id, company_id, company_type_id, note)             VALUES ('668574', '1929733', '181', '1', '(2013) (Japan) (TV)');

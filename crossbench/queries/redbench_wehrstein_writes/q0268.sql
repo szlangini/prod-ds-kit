@@ -1,0 +1,1 @@
+DELETE FROM cast_info             WHERE id = '4186189' AND person_id = '560277' AND movie_id = '1336895' AND person_role_id = '826089' AND note IS NULL AND nr_order = '18' AND role_id = '1'; INSERT INTO cast_info (id, person_id, movie_id, person_role_id, note, nr_order, role_id)             VALUES ('4186189', '560277', '1336895', '826089', NULL, '18', '1');

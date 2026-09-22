@@ -48,13 +48,20 @@ set its env var, e.g. `SF_E4=100 ./reproduce_EAB.sh E4`.
 | Target | What it does | Paper output |
 |---|---|---|
 | `all` | `E1 E2 E3 E4 E5` → figures & tables. **Excludes E0 and E4X**: run `--experiment E0` first (E1/E5 need its `common_subset.json`, and silently use the full query set without it), and `--experiment E4X` separately | — |
-| `E1` | end-to-end TPC-DS vs Prod-DS | Fig. 7, Fig. 8, Table 4 |
-| `E2` | join-scaling micro-suite, J = 16…2048 | Fig. 10 |
-| `E3` | UNION ALL fan-in, U = 2…2048 | Fig. 11 |
-| `E4` | stringification sweep STR = 1…10 + STRLEN (DuckDB) | Fig. 9 |
+| `E1` | end-to-end TPC-DS vs Prod-DS | Fig. 7 (§6.5), Fig. 8 (§6.5), Table 5 (§6.5) |
+| `E2` | join-scaling micro-suite, J = 16…2048 | Fig. 11 (§6.7) |
+| `E3` | UNION ALL fan-in, U = 2…2048 | Fig. 12 (§6.8) |
+| `E4` | stringification sweep STR = 1…10 + STRLEN (DuckDB) | Fig. 10 (§6.6) |
 | `E4X` | stringification sweep, cross-engine | — |
-| `E5` | sparsity & skew sensitivity (low/medium/high) | Table 5 |
+| `E5` | sparsity & skew sensitivity (low/medium/high) | Table 6 (§6.9) |
 | `figures` | (re)render figures + tables from existing results | — |
+
+Two paper results are **not** `reproduce.sh` targets and live in their own directories:
+**Figure 9 (§6.5)**, the cross-benchmark runtime CDF, in `crossbench/`; and the **§6.7
+compilation-estimate paragraph** in `compilation/`. `REPRODUCIBILITY.md` has the commands.
+Filenames in the generators are legacy and do not track the paper numbers — `fig13_*` is
+Figure 10, `fig10_error_breakdown` is Table 5, `table3_*` is Table 6.
+
 | `clean` | remove results + rendered artifact (keep generated data) | — |
 | `clean-data` | also free regenerable variant data (keep base + results) | — |
 | `purge` | full reset: all data + DBs + results (keep engine binaries) | — |

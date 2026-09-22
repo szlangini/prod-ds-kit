@@ -1,0 +1,1 @@
+DELETE FROM keyword             WHERE id = '61812' AND keyword = 'sepal' AND phonetic_code = 'S14'; INSERT INTO keyword (id, keyword, phonetic_code)             VALUES ('61812', 'sepal', 'S14');

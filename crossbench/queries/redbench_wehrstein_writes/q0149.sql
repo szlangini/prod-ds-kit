@@ -1,0 +1,1 @@
+DELETE FROM complete_cast             WHERE id = '93503' AND movie_id = '260763' AND subject_id = '2' AND status_id = '3'; INSERT INTO complete_cast (id, movie_id, subject_id, status_id)             VALUES ('93503', '260763', '2', '3');

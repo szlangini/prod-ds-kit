@@ -1,0 +1,7 @@
+suite,mode,mode_name,n_queries,median_compilation_ms,mean_compilation_ms,p90_compilation_ms,max_compilation_ms,min_compilation_ms,sum_compilation_s,median_prepare_ms,n_queries_over_1s
+prodds,A,Auto (default),98,0.2,0.3,0.6,3.6,-0.2,0.03,3.3,0
+prodds,c,Cheap,98,20.6,30.1,45.3,386.3,6.6,2.95,23.5,0
+prodds,o,Optimized,98,142.5,207.2,310.3,2357.3,40.7,20.31,146.1,2
+tpcds,A,Auto (default),99,0.1,0.3,0.3,2.9,-0.1,0.02,3.3,0
+tpcds,c,Cheap,99,18.4,20.5,36.2,59.6,6.9,2.03,21.8,0
+tpcds,o,Optimized,99,129.3,147.7,236.4,490.2,32.3,14.62,131.9,0

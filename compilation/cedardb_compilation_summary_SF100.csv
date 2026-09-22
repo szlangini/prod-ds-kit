@@ -1,0 +1,9 @@
+suite,mode,mode_name,n_queries,median_compilation_ms,mean_compilation_ms,p90_compilation_ms,max_compilation_ms,min_compilation_ms,sum_compilation_s,median_prepare_ms,n_queries_over_1s
+prodds,A,Auto (default),97,0.2,0.2,0.3,1.6,-1.5,0.02,3.3,0
+prodds,d,DirectEmit,97,0.2,0.1,0.3,1.2,-1.8,0.01,3.2,0
+prodds,c,Cheap,97,21.3,29.8,40.6,388.9,6.7,2.89,24.0,0
+prodds,o,Optimized,97,142.5,203.0,315.3,2359.3,41.4,19.69,145.3,2
+tpcds,A,Auto (default),99,0.2,0.4,0.5,3.9,-0.3,0.04,3.3,0
+tpcds,d,DirectEmit,99,0.2,0.2,0.4,0.7,-4.3,0.02,3.1,0
+tpcds,c,Cheap,99,18.2,20.4,36.3,58.5,6.8,2.02,21.2,0
+tpcds,o,Optimized,99,127.2,147.1,235.4,487.6,31.8,14.57,130.5,0

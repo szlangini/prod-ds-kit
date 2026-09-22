@@ -1,0 +1,1 @@
+DELETE FROM comp_cast_type             WHERE id = '4' AND kind = 'complete+verified'; INSERT INTO comp_cast_type (id, kind)             VALUES ('4', 'complete+verified');

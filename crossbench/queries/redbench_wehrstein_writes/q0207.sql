@@ -1,0 +1,1 @@
+DELETE FROM info_type             WHERE id = '107' AND info = 'gross'; INSERT INTO info_type (id, info)             VALUES ('107', 'gross');

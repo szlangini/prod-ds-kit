@@ -1,0 +1,1 @@
+DELETE FROM info_type             WHERE id = '74' AND info = 'LD dialogue intellegibility'; INSERT INTO info_type (id, info)             VALUES ('74', 'LD dialogue intellegibility');

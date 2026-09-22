@@ -1,0 +1,1 @@
+DELETE FROM info_type             WHERE id = '62' AND info = 'LD group genre'; INSERT INTO info_type (id, info)             VALUES ('62', 'LD group genre');

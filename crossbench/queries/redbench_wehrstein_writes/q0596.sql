@@ -1,0 +1,1 @@
+DELETE FROM person_info             WHERE id = '1704615' AND person_id = '2282473' AND info_type_id = '26' AND info = 'Crabbe, Jeanne Berthe Adolphine' AND note IS NULL; INSERT INTO person_info (id, person_id, info_type_id, info, note)             VALUES ('1704615', '2282473', '26', 'Crabbe, Jeanne Berthe Adolphine', NULL);

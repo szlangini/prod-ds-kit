@@ -410,12 +410,13 @@ generate_all_data() {
             nullprof=(--null-profile "$e5tier"); mcvprof=(--mcv-profile "$e5tier")
             bothprof=(--mcv-profile "$e5tier" --null-profile "$e5tier")
         fi
-        # E5 arms isolate one axis each (NULL sparsity, MCV skew, join-key skew);
-        # combined = NULL + MCV (the paper's Table 5 decomposition), full = all
-        # three axes = the Prod-DS default; skew_all = MCV + key skew with NULL off
-        # (the joint "skew" row of the paper table: value and key skew are one axis,
-        # split only by mechanism). Key skew stays off in the single-axis
-        # NULL/MCV arms and in combined so the decomposition stays additive.
+        # E5 arms isolate one axis each (NULL sparsity, MCV skew, join-key skew).
+        # The PAPER's Table 6 rows are sparsity_only, skew_all and full -- NULL sparsity,
+        # skew (value AND key), and their combination. skew_all = MCV + key skew with NULL
+        # off, because value and key skew are ONE axis in the paper, split only by mechanism;
+        # full = all three axes = the Prod-DS default, and it is the paper's combination row.
+        # combined = NULL + MCV only, with key skew off: an artifact-table arm that keeps the
+        # single-axis decomposition additive. It is NOT the paper's combination row.
         local keyprof=() fullprof=() skewprof=()
         if [ "$e5tier" != "medium" ]; then
             keyprof=(--key-skew-profile "$e5tier")

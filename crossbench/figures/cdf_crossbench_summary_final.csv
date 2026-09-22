@@ -1,0 +1,10 @@
+suite,label,kind,data_logical_gib,data_on_disk_gib,queries_attempted,complete_all_passes,partial_success,failed_all_passes,instances_in_cdf,warmup_failures,median_s,p90_s,p95_s,p99_s,max_s,min_s,spread_x,median_measured_pass_wall_s,median_sum_of_own_query_timers_per_pass_s,amplification_share_of_total_pct
+prodds,"Prod-DS (default, 107)",read,11.43,4.75,107,107,0,0,107,0,0.1059,0.4909,12.6336,91.5906,168.5199,0.0186,9081,428.55,413.509,91.77
+prodds_templates,"Prod-DS, 99 templates",read,11.43,4.75,99,99,0,0,99,0,0.1027,0.3123,0.4130,1.1045,20.6600,0.0186,1113,unavailable,34.086,
+tpcds,TPC-DS,read,11.36,5.97,99,99,0,0,99,0,0.0761,0.2851,0.3679,0.7904,0.9442,0.0139,68,13.34,13.308,
+dsb,DSB,read,11.79,6.12,104,104,0,0,104,0,0.0490,0.1134,0.1526,0.2233,0.2399,0.0109,22,6.31,6.282,
+job,JOB,read,3.61,2.01,113,113,0,0,113,0,0.0597,0.1283,0.1449,0.2009,0.4868,0.0100,49,8.44,8.403,
+redbench_krid,Redbench (Krid et al.),read,3.61,2.01,763,763,0,0,8784,0,0.0947,0.1892,0.1892,0.3090,0.5230,0.0173,30,70.38,70.112,
+sqlbarber,SQLBarber,read,3.61,2.01,1000,1000,0,0,1000,0,0.0066,0.0196,0.0213,0.0246,0.0319,0.0016,20,10.69,10.469,
+redbench_wehrstein_reads,"Redbench (Wehrstein et al.), reads",read,3.61,2.01,62,62,0,0,62,0,0.0480,0.0778,0.0801,0.1070,0.1190,0.0290,4,3.27,3.252,
+redbench_wehrstein_writes,"Redbench (Wehrstein et al.), writes",write,3.61,2.01,938,938,0,0,938,0,0.0020,0.0044,0.0053,0.0070,0.0104,0.0012,8,2.51,2.384,

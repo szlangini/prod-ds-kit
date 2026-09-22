@@ -63,17 +63,37 @@ docker run --rm -it -v "$PWD/.reproduce:/opt/prod-ds-kit/.reproduce" \
 
 ## Experiments
 
-| ID | Description | Engines | Scale | Paper figure/table | Data file — `experiments/data/paper_csv/` |
-|----|-------------|---------|-------|--------------------|-------------------------------------------|
-| E1 | End-to-end TPC-DS vs Prod-DS | all 3 | SF100 | Fig. 7, Fig. 8, Table 4 | `E1_total_workload_runtime_SF100.csv` (Fig. 7) · `E1_per_query_runtime_SF100.csv` (Fig. 8) · `E1_error_breakdown_SF100.csv` + `E1_error_per_query_SF100.csv` (Table 4) |
-| E2 | Join-scaling micro-suite (J=16..2048) | all 3 | SF100 | Fig. 10 | `E2_join_scaling_SF100.csv` |
-| E3 | UNION ALL fan-in scaling (U=2..2048) | all 3 | SF100 | Fig. 11 | `E3_union_fanin_SF100.csv` |
-| E4 | Stringification sweep (STR=1..10) + STRLEN | DuckDB | SF10 | Fig. 9 | `E4_stringification_sweep_SF10_duckdb.csv` |
+| ID | Description | Engines | Scale | Paper location | Data file — `experiments/data/paper_csv/` |
+|----|-------------|---------|-------|----------------|-------------------------------------------|
+| E1 | End-to-end TPC-DS vs Prod-DS | all 3 | SF100 | Fig. 7 (§6.5), Fig. 8 (§6.5), Table 5 (§6.5) | `E1_total_workload_runtime_SF100.csv` (Fig. 7) · `E1_per_query_runtime_SF100.csv` (Fig. 8) · `E1_error_breakdown_SF100.csv` + `E1_error_per_query_SF100.csv` (Table 5) |
+| CDF | Cross-benchmark runtime CDF, 8 curves over 6 comparator suites | DuckDB | SF100-class, matched data sizes | Fig. 9 (§6.5) | not in `paper_csv/` — see [`crossbench/`](crossbench/) |
+| E2 | Join-scaling micro-suite (J=16..2048) | all 3 | SF100 | Fig. 11 (§6.7) | `E2_join_scaling_SF100.csv` |
+| CMP | CedarDB compilation estimates under forced optimized compilation | CedarDB (DuckDB planner comparator) | SF100 and SF10 | paragraph in §6.7, **no figure** | not in `paper_csv/` — see [`compilation/`](compilation/) |
+| E3 | UNION ALL fan-in scaling (U=2..2048) | all 3 | SF100 | Fig. 12 (§6.8) | `E3_union_fanin_SF100.csv` |
+| E4 | Stringification sweep (STR=1..10) + STRLEN | DuckDB | SF10 | Fig. 10 (§6.6) | `E4_stringification_sweep_SF10_duckdb.csv` |
 | E4X | Stringification, cross-engine | all 3 | SF10 | — (revision material) | rendered by `plot_str_crossengine.py` |
-| E5 | Sparsity and skew sensitivity | all 3 | SF10 and SF100 | Table 5 | `E5_sparsity_skew_SF10.csv` (Table 5, Δ%) · `E5_per_query_SF10.csv` (per-query medians) · `E5_sparsity_skew_SF100.csv` + `E5_per_query_SF100.csv` + `E5_summary_SF{10,100}.csv` (the SF100 arm, added for the revision) |
+| E5 | Sparsity and skew sensitivity | all 3 | SF10 and SF100 | Table 6 (§6.9) | `E5_sparsity_skew_SF10.csv` (Table 6, Δ%) · `E5_per_query_SF10.csv` (per-query medians) · `E5_sparsity_skew_SF100.csv` + `E5_per_query_SF100.csv` + `E5_summary_SF{10,100}.csv` (the SF100 arm, added for the revision) |
+
+**Table 4 (§6.1), the engine-properties survey, is prose**; no experiment in this repository
+produces it.
+
+**E5's three paper rows** are NULL sparsity, skew (value *and* key together), and their
+combination: `experiments/make_skew_table.py` builds them from the arms `sparsity_only`,
+`skew_all` and `full`. Six arms are measured and shipped — the three above plus `skew_only`
+(value skew alone), `keyskew_only` and `combined` (NULL + value skew, key skew off) — and
+`--all-arms` renders every one. Note that `combined` is **not** the paper's combination row;
+`full` is.
+
+**The feasibility/error overview (Table 5) is deliberately conservative and is not the raw E0
+tally.** `experiments/export_paper_csv.py` attributes it from the **E0 audit** whenever an E0
+tree exists, because E1 runs only the common subset and so cannot see the failures that defined
+it; `E1_error_per_query_SF100.csv` carries the per-query cause class behind each count. Keep the
+two apart when quoting: the audit outcome is what `E0_audit_per_query_SF<N>.csv` records.
 
 Not tied to a single figure, and shipped alongside: `E1_compilation_time_SF100.csv`
-(the separately executed `EXPLAIN` client per engine and suite),
+(the separately executed `EXPLAIN` client per engine and suite — **this is not the source of
+the §6.7 compilation estimates**; it times a whole client process running `EXPLAIN`, most of
+which is client startup, and the §6.7 numbers come from [`compilation/`](compilation/)),
 `plan_join_complexity_SF{10,100}_<engine>.csv` (joins written against joins planned, both
 scales) and `run_provenance_SF{10,100}.csv` (engine versions, harness commit, threads,
 repetitions, timeout, host). The **data-side seeds are not in the provenance CSV** — they
@@ -84,9 +104,63 @@ Per-figure/table CSVs are in [`experiments/data/paper_csv/`](experiments/data/pa
 `./reproduce_EAB.sh figures` renders every figure and table from a completed run's
 `.reproduce/sf*/results`.
 
-> The in-repo figure generators emit legacy output filenames (e.g. `fig13_*`,
-> `table3_*`) — match outputs to the paper by experiment/content per the table above,
-> not by filename.
+> **Filenames are not paper numbers.** The in-repo figure generators emit legacy output
+> filenames (`fig13_*` is Figure 10, `fig10_error_breakdown` is Table 5, `table3_*` is
+> Table 6); for the two ladders the file numbers happen to coincide with the paper
+> (`fig11_*` is Figure 11, `fig12_*` is Figure 12), which is a coincidence and not a rule.
+> Match outputs to the paper by experiment and content per the table above, never by
+> filename. Filenames are kept as they are so that earlier outputs stay comparable.
+
+## Figure 9 and the §6.7 compilation estimates
+
+Two results have their own self-contained directories, because neither is produced by
+`reproduce.sh`. Both are reproducible **from a clean checkout with no database and no engine
+install** — the measurement records travel with them.
+
+### Figure 9 — cross-benchmark runtime CDF
+
+```bash
+git clone https://github.com/szlangini/prod-ds-kit.git
+cd prod-ds-kit/crossbench
+python3 make_cdf_figure_final.py        # both exports + the summary tables, from results/final/
+python3 verify_cdf_exports.py           # checks them against each other and against the page
+```
+
+`figures/cdf_crossbench_paper.{pdf,png}` is **paper Figure 9**, one manuscript column wide.
+`figures/cdf_crossbench_final.{pdf,png}` is the same plot on a full-width canvas, kept for the
+response letter; the two are the same curves at two sizes and the renderer verifies that on
+every run. Needs only Python with `matplotlib` and `numpy`.
+
+> **Not to be confused with [`experiments/plot_cdf_crossbench.py`](experiments/plot_cdf_crossbench.py).**
+> That is an **earlier, superseded experiment** kept for the record: a different pipeline over
+> `experiments/data/s7_cdf/`, drawing SF10 across eight suites and SF100 across five scalable
+> ones, not run under the ten-pass protocol. **It does not produce Figure 9** and its outputs
+> are not the paper's. `crossbench/` is the accepted path.
+
+### §6.7 — CedarDB compilation estimates
+
+```bash
+cd prod-ds-kit/compilation
+python3 summarize_compilation.py --scale 100    # per-query medians and workload aggregates
+python3 summarize_compilation.py --scale 10     # the second scale, same treatment
+```
+
+The raw records travel with the directory, so the summaries above regenerate without an engine.
+Re-measuring needs CedarDB and a loaded SF100 database under `.reproduce/` and takes about
+six minutes:
+
+```bash
+python3 measure_cedardb_compilation.py --scale 100 --suites prodds,tpcds \
+        --modes i,A,d,c,o --reps 5 --out cedardb_compilation_raw_SF100.csv
+```
+
+**What the numbers are.** Per query, the difference between the median `PREPARE` time under
+forced `Optimized` compilation and under `Interpreted`, each over five repetitions in its own
+session, then summarised across queries. They are **estimated compilation costs under forced
+optimized compilation**. They do not isolate pure code generation, and they are not the
+compilation component of the default-mode campaign: the campaign ran CedarDB's default `Auto`
+mode, whose `PREPARE` defers compilation into the execution stage. `compilation/README.md` has
+the method, the caveats and the per-query data.
 
 ## Engine versions
 
@@ -97,13 +171,16 @@ Per-figure/table CSVs are in [`experiments/data/paper_csv/`](experiments/data/pa
 `--init` installs all three, version-pinned. If an engine cannot be installed, the
 run logs it and continues with the rest; DuckDB alone covers E1–E5.
 
-## Measurement protocol (paper Section 6.2)
+## Measurement protocol (paper Sections 6.2 and 6.4)
 
 - **Isolation:** one engine at a time.
 - **Warmup:** one untimed execution of the first query of each suite before the timed
   repetitions (`--warmup N` = number of leading queries, default 1); the timed
   repetitions of every query then run back to back.
-- **Repetitions:** 10 timed; median reported.
+- **Repetitions:** 10 timed; the **median of a query's ten executions** is that query's
+  runtime, and total workload runtime is the **sum of those per-query medians** — not the
+  wall time of any single pass. §6.2 is the hardware and execution environment; §6.4 is
+  the methodology, including repetitions and aggregation.
 - **Timeout:** 1800 s per query.
 - **Audit first (E0):** `./reproduce.sh --experiment E0` runs every query of both suites
   once, untimed, on each requested engine and writes the common subset

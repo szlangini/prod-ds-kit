@@ -1,0 +1,1 @@
+DELETE FROM company_type             WHERE id = '3' AND kind = 'special effects companies'; INSERT INTO company_type (id, kind)             VALUES ('3', 'special effects companies');

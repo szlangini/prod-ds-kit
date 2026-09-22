@@ -1,0 +1,1 @@
+DELETE FROM kind_type             WHERE id = '3' AND kind = 'tv movie'; INSERT INTO kind_type (id, kind)             VALUES ('3', 'tv movie');

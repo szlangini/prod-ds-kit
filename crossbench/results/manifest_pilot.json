@@ -1,0 +1,88 @@
+{
+  "experiment": "cross-benchmark per-query runtime CDF (pilot)",
+  "protocol": "read suites: 1 untimed warmup pass then 1 timed pass; write suites: 1 timed pass, no warmup",
+  "measured": "wall clock from submitting the query to the complete result being materialised in the client (execute + fetchall), warm database",
+  "repetitions": 1,
+  "engine": "duckdb 1.4.4",
+  "threads": 56,
+  "memory_limit": "700GB",
+  "per_query_timeout_s": 300.0,
+  "started": "2026-09-15 21:49:21 BST",
+  "host": "helios",
+  "kernel": "7.0.0-30-generic",
+  "cpu_count": 112,
+  "python": "3.12.3",
+  "suites": {
+    "prodds": {
+      "kind": "read",
+      "note": "Prod-DS current default at SF10: STR=5, NULL sparsity, MCV skew and key skew all on.",
+      "database": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/databases/duckdb/prodds_sf10_str5.duckdb",
+      "database_bytes": 8475914240,
+      "source_data": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/data/prodds_sf10_str5",
+      "source_data_bytes": {
+        "logical": 12272837471,
+        "on_disk": 5096428544
+      },
+      "query_dir": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/queries/duckdb/prodds",
+      "n_queries": 107,
+      "note_size": "logical = bytes the engine reads; on_disk = filesystem footprint (compressed)"
+    },
+    "tpcds": {
+      "kind": "read",
+      "note": "Vanilla TPC-DS SF10 from the same generator run as the Prod-DS database.",
+      "database": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/databases/duckdb/tpcds_sf10.duckdb",
+      "database_bytes": 8115466240,
+      "source_data": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/data/tpcds_sf10",
+      "source_data_bytes": {
+        "logical": 12194735029,
+        "on_disk": 6414016512
+      },
+      "query_dir": "/home/jvs34/prod-ds-cleanup/.reproduce/sf10/queries/duckdb/tpcds",
+      "n_queries": 99,
+      "note_size": "logical = bytes the engine reads; on_disk = filesystem footprint (compressed)"
+    },
+    "dsb": {
+      "kind": "read",
+      "note": "DSB at its own SF10. Database built June 2026 by the S7 runner, reused unchanged.",
+      "database": "/home/jvs34/PROD-DS-Revision-Results/s7_cdf/dbs/sf10_dsb.duckdb",
+      "database_bytes": 3297783808,
+      "source_data": "/home/jvs34/Prod.DS.Revision/Benchmarks/dsb/data",
+      "source_data_bytes": {
+        "logical": 12661955964,
+        "on_disk": 6574659584
+      },
+      "query_dir": "/home/jvs34/Prod.DS.Revision/Benchmarks/dsb/queries",
+      "n_queries": 104,
+      "note_size": "logical = bytes the engine reads; on_disk = filesystem footprint (compressed)"
+    },
+    "job": {
+      "kind": "read",
+      "note": "Join Order Benchmark on the full IMDb dataset. Not scale-factor driven.",
+      "database": "/home/jvs34/PROD-DS-Revision-Results/s7_cdf/dbs/sf10_job.duckdb",
+      "database_bytes": 1356869632,
+      "source_data": "/home/jvs34/Prod.DS.Revision/Benchmarks/job/data",
+      "source_data_bytes": {
+        "logical": 3880615640,
+        "on_disk": 2158865408
+      },
+      "query_dir": "/home/jvs34/Prod.DS.Revision/Benchmarks/job/queries",
+      "n_queries": 113,
+      "note_size": "logical = bytes the engine reads; on_disk = filesystem footprint (compressed)"
+    },
+    "redbench": {
+      "kind": "write",
+      "note": "RedBench: 1,000 single-row DELETE+INSERT statements over the IMDb database that JOB also uses (its data directory is a symlink to JOB's). This is a write workload, not an analytical one -- see the README before comparing its curve with the others.",
+      "database": "/home/jvs34/PROD-DS-Revision-Results/s7_cdf/dbs/sf10_redbench.duckdb",
+      "database_bytes": 1359228928,
+      "source_data": "/home/jvs34/Prod.DS.Revision/Benchmarks/redbench/data",
+      "source_data_bytes": {
+        "logical": 3880615640,
+        "on_disk": 2158865408
+      },
+      "query_dir": "/home/jvs34/Prod.DS.Revision/Benchmarks/redbench/queries",
+      "n_queries": 1000,
+      "note_size": "logical = bytes the engine reads; on_disk = filesystem footprint (compressed)"
+    }
+  },
+  "finished": "2026-09-15 22:04:56 BST"
+}
